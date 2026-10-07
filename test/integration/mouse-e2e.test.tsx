@@ -223,6 +223,7 @@ function MouseHarness({
         diffCount: { enabled: true },
         diffModeRatio: 0.35,
         fileListMode: 'tree' as const,
+        icons: { enabled: true },
         path: { enabled: true },
         prefetchRadius: 0,
         tab: 'diff' as const,

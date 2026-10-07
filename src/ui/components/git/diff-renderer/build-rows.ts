@@ -331,6 +331,41 @@ export function buildDiffSegments(file: FileDiffMetadata, folds: FoldMap = {}): 
   return { firstChangeOffset, segments }
 }
 
+/**
+ * A file shown as it is rather than as a change: every line, nothing folded, no
+ * hunk header. Fed the all-context patch `buildContextPatch` makes, so the rows,
+ * wrapping and highlighting are the diff's own.
+ */
+export function buildFileSegments(file: FileDiffMetadata): DiffSegment[] {
+  const segments: DiffSegment[] = []
+  let offset = 0
+  for (const [hIdx, hunk] of file.hunks.entries()) {
+    let delLine = hunk.deletionStart
+    let addLine = hunk.additionStart
+    for (const [cIdx, content] of hunk.hunkContent.entries()) {
+      if (content.type !== 'context') continue
+      for (let consumed = 0; consumed < content.lines; consumed += CONTEXT_SEGMENT_CHUNK_LINES) {
+        const count = Math.min(CONTEXT_SEGMENT_CHUNK_LINES, content.lines - consumed)
+        segments.push({
+          addLineNumberStart: addLine + consumed,
+          addStart: content.additionLineIndex + consumed,
+          count,
+          delLineNumberStart: delLine + consumed,
+          delStart: content.deletionLineIndex + consumed,
+          estimatedHeight: count,
+          id: `${hIdx}:${cIdx}:file:${consumed}`,
+          kind: 'context',
+          offset: offset + consumed,
+        })
+      }
+      addLine += content.lines
+      delLine += content.lines
+      offset += content.lines
+    }
+  }
+  return segments
+}
+
 export function expandSplitSegment(
   file: FileDiffMetadata,
   segment: DiffSegment,

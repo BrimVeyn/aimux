@@ -6,7 +6,7 @@ import type { DiffData, GitDiffView } from '../../../../state/types'
 import type { ScreenRect } from '../image-diff/terminal-image-pane'
 
 import { type BlockEntry, diffUnits, parseUnits, splitUnifiedDiff } from '../../../../markdown-diff'
-import { overrideGitDiffScroller } from '../../../git-view-controls'
+import { useDiffScroll } from '../../../git-view-controls'
 import { useTheme } from '../../../theme'
 import { EntryView, type RenderContext } from './blocks'
 
@@ -95,6 +95,10 @@ interface MarkdownDiffViewProps {
   /** Every fold open, from `e`. */
   expandAll: boolean
   repoRoot: string | null
+  /** A file read as it is, not a change: no summary of what changed. */
+  single?: boolean
+  /** The key that shows the source instead, named in the header. Null names none. */
+  sourceKey?: string | null
   themeId: string
   view: GitDiffView
 }
@@ -103,6 +107,8 @@ export const MarkdownDiffView = memo(function MarkdownDiffView({
   diff,
   expandAll,
   repoRoot,
+  single = false,
+  sourceKey = 'r',
   themeId,
   view,
 }: MarkdownDiffViewProps) {
@@ -140,15 +146,16 @@ export const MarkdownDiffView = memo(function MarkdownDiffView({
     [diff.path, repoRoot, themeId, visibleIn]
   )
 
+  const slot = useDiffScroll()
   useEffect(
     () =>
-      overrideGitDiffScroller((delta) => {
+      slot.override((delta) => {
         const scroll = scrollRef.current
         if (!scroll) return
         const cap = Math.max(scroll.scrollHeight - scroll.viewport.height, 0)
         scroll.scrollTop = Math.max(0, Math.min(cap, scroll.scrollTop + delta))
       }),
-    []
+    [slot]
   )
 
   // Open on the first change: once its row has been laid out, bring it to the top
@@ -189,11 +196,19 @@ export const MarkdownDiffView = memo(function MarkdownDiffView({
       ) : null}
       {/* Fixed height: the document under it is taller than the screen, and flex
           would otherwise shrink this row away to make room for it. */}
-      <box flexShrink={0} paddingLeft={1} paddingRight={1}>
-        <text fg={t.textMuted}>
-          rendered · {summary} · <span fg={t.primary}>r</span> source
-        </text>
-      </box>
+      {single ? null : (
+        <box flexShrink={0} paddingLeft={1} paddingRight={1}>
+          <text fg={t.textMuted}>
+            rendered · {summary}
+            {sourceKey === null ? null : (
+              <>
+                {' · '}
+                <span fg={t.primary}>{sourceKey}</span> source
+              </>
+            )}
+          </text>
+        </box>
+      )}
       <scrollbox
         ref={scrollRef}
         flexGrow={1}

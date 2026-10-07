@@ -50,11 +50,20 @@ export function gitFileKey(
     : `${file.section}:${file.path}`
 }
 
-/** Files whose path contains `filter`, ignoring case. An empty filter keeps them all. */
+let lastFilter: { files: GitFileEntry[]; filter: string; out: GitFileEntry[] } | null = null
+
+/**
+ * Files whose path contains `filter`, ignoring case. An empty filter keeps them
+ * all. The last answer is kept, and handed back as the same array, so the tree
+ * built from it is not built again on the next keypress.
+ */
 export function filterGitFiles(files: GitFileEntry[], filter: string | null): GitFileEntry[] {
   if (filter == null || filter === '') return files
+  if (lastFilter?.files === files && lastFilter.filter === filter) return lastFilter.out
   const lower = filter.toLowerCase()
-  return files.filter((file) => file.path.toLowerCase().includes(lower))
+  const out = files.filter((file) => file.path.toLowerCase().includes(lower))
+  lastFilter = { files, filter, out }
+  return out
 }
 
 /**
@@ -77,11 +86,44 @@ export function gitFolderKey(section: GitFileSection, folderPath: string): strin
   return `${section}:dir:${folderPath}`
 }
 
+let lastTree: {
+  files: GitFileEntry[]
+  collapsedFolders: Record<string, true>
+  fileListMode: GitFileListMode
+  compact: boolean
+  rows: GitTreeRows
+} | null = null
+
+/**
+ * The sidebar's rows. Every git mode keypress asks for them — the reducer to
+ * move the cursor, the panel to draw it — from inputs a cursor move leaves
+ * alone, so the last answer is kept: with thousands of changes, sorting them
+ * into a tree on every `j` is most of what the key costs.
+ */
 export function buildGitTreeRows(
   files: GitFileEntry[],
   collapsedFolders: Record<string, true>,
   fileListMode: GitFileListMode = 'tree',
   compact: boolean = false
+): GitTreeRows {
+  if (
+    lastTree?.files === files &&
+    lastTree.collapsedFolders === collapsedFolders &&
+    lastTree.fileListMode === fileListMode &&
+    lastTree.compact === compact
+  ) {
+    return lastTree.rows
+  }
+  const rows = buildTreeRows(files, collapsedFolders, fileListMode, compact)
+  lastTree = { collapsedFolders, compact, fileListMode, files, rows }
+  return rows
+}
+
+function buildTreeRows(
+  files: GitFileEntry[],
+  collapsedFolders: Record<string, true>,
+  fileListMode: GitFileListMode,
+  compact: boolean
 ): GitTreeRows {
   const sections = SECTION_ORDER.map((section) => {
     const sectionFiles = files.filter((file) => file.section === section)
@@ -135,22 +177,57 @@ export function getSelectedGitFile(
   return row?.kind === 'file' ? row.file : null
 }
 
+/**
+ * Where the selection goes when the list changes under it. A row that is still
+ * there keeps it. One that went — a file discarded, staged into another
+ * section, filtered out — hands it to its neighbour in the list as it was
+ * (`previousKeys`): the next row that survived, else the one before it. The
+ * top of the list is the last resort, not the answer: deleting the file you
+ * are on must not throw you back to the first one.
+ */
 export function reconcileSelectedGitEntryKey(
   files: GitFileEntry[],
   collapsedFolders: Record<string, true>,
   fileListMode: GitFileListMode,
   selectedEntryKey: string | null | undefined,
   preferredKeys: string[] = [],
-  compact: boolean = false
+  compact: boolean = false,
+  previousKeys: readonly string[] = []
 ): string | null {
   const { visibleRows } = buildGitTreeRows(files, collapsedFolders, fileListMode, compact)
   if (visibleRows.length === 0) return null
+  const present = new Set(visibleRows.map((row) => row.key))
   const candidates = [...preferredKeys, selectedEntryKey ?? '']
   for (const key of candidates) {
     if (!key) continue
-    if (visibleRows.some((row) => row.key === key)) return key
+    if (present.has(key)) return key
+  }
+  const at = selectedEntryKey == null ? -1 : previousKeys.indexOf(selectedEntryKey)
+  if (at !== -1) {
+    // A file row first, either way: landing on a folder shows no diff.
+    const after = previousKeys.slice(at + 1)
+    const before = previousKeys.slice(0, at).reverse()
+    const isFile = (key: string): boolean => !key.includes(':dir:')
+    const neighbour =
+      after.find((key) => present.has(key) && isFile(key)) ??
+      before.find((key) => present.has(key) && isFile(key)) ??
+      after.find((key) => present.has(key)) ??
+      before.find((key) => present.has(key))
+    if (neighbour !== undefined) return neighbour
   }
   return visibleRows[0]?.key ?? null
+}
+
+/** The keys of the rows the sidebar draws now, in order: what a neighbour is. */
+export function visibleGitKeys(
+  files: GitFileEntry[],
+  collapsedFolders: Record<string, true>,
+  fileListMode: GitFileListMode,
+  compact: boolean = false
+): string[] {
+  return buildGitTreeRows(files, collapsedFolders, fileListMode, compact).visibleRows.map(
+    (row) => row.key
+  )
 }
 
 /**
@@ -287,4 +364,28 @@ function flattenTreeNode(
     })
   }
   return rows
+}
+
+/**
+ * `│ ├ └` for each row of a section, from the depths alone: the lines that tie
+ * a row to its folder, two columns a level — the width the indent was. A
+ * top-level row has none.
+ *
+ * Read backwards, so whether a row has a sibling still to come is known when
+ * it is reached: `later[k]` says a row at depth `k` follows before anything
+ * shallower closes that folder.
+ */
+export function treeGuides(rows: readonly { depth: number }[]): string[] {
+  const guides: string[] = Array.from({ length: rows.length }, () => '')
+  const later: boolean[] = []
+  for (let i = rows.length - 1; i >= 0; i--) {
+    const depth = rows[i]?.depth ?? 0
+    let guide = ''
+    for (let k = 1; k < depth; k++) guide += later[k] === true ? '│ ' : '  '
+    if (depth > 0) guide += later[depth] === true ? '├ ' : '└ '
+    guides[i] = guide
+    later[depth] = true
+    later.length = depth + 1
+  }
+  return guides
 }

@@ -15,7 +15,7 @@ import type { FileDiffMetadata } from '../../../../diff-parser'
 import type { DiffHighlights, FoldDispatch } from './pierre-diff'
 
 import { getScrollViewportDelta } from '../../../../app-runtime/terminal-mouse-adapter'
-import { scrollGitDiff } from '../../../git-view-controls'
+import { type DiffScrollSlot, useDiffScroll } from '../../../git-view-controls'
 import { useTheme } from '../../../theme'
 import {
   type DiffSegment,
@@ -78,12 +78,18 @@ interface RenderedSegment {
   segment: DiffSegment
 }
 
-function handleScroll(e: OtuiMouseEvent): void {
-  const delta = getScrollViewportDelta(e)
-  if (delta === null) return
-  e.preventDefault()
-  e.stopPropagation()
-  scrollGitDiff(delta)
+function useWheel(): (e: OtuiMouseEvent) => void {
+  const slot: DiffScrollSlot = useDiffScroll()
+  return useCallback(
+    (e: OtuiMouseEvent) => {
+      const delta = getScrollViewportDelta(e)
+      if (delta === null) return
+      e.preventDefault()
+      e.stopPropagation()
+      slot.scroll(delta)
+    },
+    [slot]
+  )
 }
 
 export const SplitView = forwardRef<SplitViewHandle, Props>(function SplitView(
@@ -95,6 +101,7 @@ export const SplitView = forwardRef<SplitViewHandle, Props>(function SplitView(
   const leftRef = useRef<ScrollBoxRenderable | null>(null)
   const rightRef = useRef<ScrollBoxRenderable | null>(null)
   const measuredHeightsRef = useRef<Record<string, number>>({})
+  const handleScroll = useWheel()
   const commitFrameRef = useRef(0)
   const [measurementVersion, setMeasurementVersion] = useState(0)
 

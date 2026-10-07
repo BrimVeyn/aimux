@@ -7,6 +7,7 @@ import type {
   PluginCommitMessageRequest,
   PluginGitStatus,
   PluginNotificationEvent,
+  PluginRepoFile,
   PluginSettingValue,
   PluginStoreApi,
   PluginThemeSnapshot,
@@ -90,6 +91,8 @@ export interface TestUiSurface {
   deliverNotification: (event: PluginNotificationEvent) => Promise<void>
   /** Drives `ctx.ui.git.diff`. */
   setGitDiff: (path: string, diff: string) => void
+  /** Drives `ctx.ui.git.files`. */
+  setRepoFiles: (files: readonly PluginRepoFile[]) => void
 }
 
 const EMPTY_STATE: PluginUiState = {
@@ -138,6 +141,7 @@ export function createTestUiSurface(effects: EffectStack): TestUiSurface {
   const layoutCalls: string[] = []
   const gitWrites: string[] = []
   const diffs = new Map<string, string>()
+  let repoFiles: PluginRepoFile[] = []
   let notificationSink: ((event: PluginNotificationEvent) => void | Promise<void>) | null = null
 
   let state: PluginUiState = EMPTY_STATE
@@ -184,6 +188,7 @@ export function createTestUiSurface(effects: EffectStack): TestUiSurface {
       discard: async (paths) => {
         gitWrites.push(`discard:${paths.join(',')}`)
       },
+      files: async () => [...repoFiles],
       provideCommitMessage: (provider) => {
         commitProvider = provider
         registrations.commitMessageProvider = true
@@ -202,12 +207,22 @@ export function createTestUiSurface(effects: EffectStack): TestUiSurface {
         gitWrites.push(`unstage:${paths.join(',')}`)
       },
     },
+    input: {
+      close: () => opened.push('input:close'),
+      open: () => opened.push('input:open'),
+      use: () => null,
+    },
     kit: {
+      fileIcon: () => ({ glyph: '', tone: 'textMuted' }),
+      FileView: nothing,
+      folderIcon: () => ({ glyph: '', tone: 'textMuted' }),
       KeyHint: nothing,
       List: nothing,
       Panel: nothing,
       Row: nothing,
+      TextField: nothing,
       useTheme: () => theme.colors,
+      VirtualList: nothing,
     },
     layout: {
       close: (tabId) => layoutCalls.push(`close:${tabId ?? 'active'}`),
@@ -352,6 +367,9 @@ export function createTestUiSurface(effects: EffectStack): TestUiSurface {
     },
     setGitStatus: (status) => {
       git = status
+    },
+    setRepoFiles: (files) => {
+      repoFiles = [...files]
     },
     setSetting: (id, value) => {
       settings.set(id, value)

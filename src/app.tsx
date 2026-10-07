@@ -151,6 +151,7 @@ export function App({
       treeCompaction: userGitPane?.initialTreeCompaction ?? json.gitPane?.treeCompaction ?? true,
       ...(userGitPane?.path !== undefined ? { path: userGitPane.path } : {}),
       ...(userGitPane?.diffCount !== undefined ? { diffCount: userGitPane.diffCount } : {}),
+      ...(userGitPane?.icons !== undefined ? { icons: userGitPane.icons } : {}),
     }
 
     const projectCatalog = loadProjectCatalog()

@@ -22,6 +22,8 @@ export function graphicsBanner(protocol: 'kitty' | 'iterm' | 'none', what: strin
 
 interface ImageDiffViewProps {
   diff: DiffData
+  /** One image shown as it is: no second side to label it against. */
+  single?: boolean
 }
 
 interface PaneProps {
@@ -52,7 +54,7 @@ const Pane = memo(function Pane({ bytes, formatLabel, label, mime, protocol }: P
     .join(' · ')
   return (
     <box flexDirection="column" flexGrow={1} padding={1}>
-      <text fg={t.text}>{label}</text>
+      {label === '' ? null : <text fg={t.text}>{label}</text>}
       {protocol === 'kitty' ? (
         <TerminalImagePane bytes={bytes} mime={mime} />
       ) : (
@@ -65,7 +67,10 @@ const Pane = memo(function Pane({ bytes, formatLabel, label, mime, protocol }: P
   )
 })
 
-export const ImageDiffView = memo(function ImageDiffView({ diff }: ImageDiffViewProps) {
+export const ImageDiffView = memo(function ImageDiffView({
+  diff,
+  single = false,
+}: ImageDiffViewProps) {
   const t = useTheme()
   const renderer = useRenderer()
   const protocol = detectGraphicsProtocol(renderer)
@@ -105,7 +110,7 @@ export const ImageDiffView = memo(function ImageDiffView({ diff }: ImageDiffView
           <Pane
             bytes={after}
             formatLabel={formatLabel}
-            label="new (working)"
+            label={single ? '' : 'new (working)'}
             mime={mime}
             protocol={protocol}
           />

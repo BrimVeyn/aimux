@@ -4,6 +4,8 @@ import type {
   PluginCommandsApi,
   PluginContext,
   PluginGitFile,
+  PluginInputApi,
+  PluginInputOptions,
   PluginKit,
   PluginLayoutNode,
   PluginStoreApi,
@@ -12,9 +14,9 @@ import type {
   PluginUiApi,
   PluginUiState,
 } from '@brimveyn/aimux-plugin'
-import type { ReactNode } from 'react'
 
 import {
+  actions,
   registerPluginAction,
   registerTuiTheme,
   type ResolvedTuiTheme,
@@ -22,6 +24,7 @@ import {
   type ThemeMode,
   type TuiThemeJson,
 } from '@brimveyn/aimux-config'
+import { type ReactNode, useMemo } from 'react'
 
 import type { PluginRecord } from '../plugins/types'
 import type { AppAction } from '../state/actions'
@@ -36,6 +39,7 @@ import {
   gitStage,
   gitUnstage,
 } from '../git/plugin-git-writes'
+import { listRepoFiles } from '../git/repo-files'
 import { registerKeymapLayer } from '../input/keymap/plugin-layer'
 import { registerSettingSection } from '../settings/sections'
 import { settingsStore } from '../settings/settings-store'
@@ -47,10 +51,11 @@ import {
   isTabLeaf,
   type LayoutNode,
 } from '../state/layout-tree'
-import { getCurrentProject } from '../state/project-workspaces'
+import { getActiveWorkspacePath, getCurrentProject } from '../state/project-workspaces'
 import { registerPluginSlice } from '../state/reducers/plugin-slices'
 import { registerStatsPage, registerStatsPageRenderer } from '../state/stats-pages'
 import { toast } from '../state/toast-store'
+import { fileIcon, folderIcon } from './file-icons'
 import { notify as deliverNotification, registerNotificationSink } from './notifications'
 import {
   closeCommandPane,
@@ -61,10 +66,20 @@ import {
   registerCommandPane,
 } from './plugin-command-panes'
 import { listPluginCommands, runPluginCommand } from './plugin-commands'
-import { KeyHint, List, Panel, Row, usePluginTheme } from './plugin-kit'
+import {
+  FileView,
+  KeyHint,
+  List,
+  Panel,
+  Row,
+  TextField,
+  usePluginTheme,
+  VirtualList,
+} from './plugin-kit'
 import { registerPluginModal } from './plugin-modals'
 import { registerPluginPane } from './plugin-panes'
 import { registerPluginView } from './plugin-views'
+import { useSelectionInk } from './selection-ink'
 import { registerStatusBarSegment } from './status-bar-segments'
 import { getCurrentMode, getCurrentTheme, subscribeThemeChanges } from './theme-store'
 import { registerBarWidget } from './widgets/registry'
@@ -144,15 +159,35 @@ function own(ctx: PluginContext, dispose: Disposer): Disposer {
 }
 
 /**
+ * The theme a plugin reads, plus the one token it cannot work out for itself:
+ * the ink for a selected `List` row, which is the *opaque* page background —
+ * in transparent mode `background` is 'transparent' and would paint the text
+ * away.
+ */
+function usePluginThemeTokens(): Record<string, string> {
+  const theme = usePluginTheme()
+  const selectionInk = useSelectionInk()
+  return useMemo(
+    () => ({ ...(theme as unknown as Record<string, string>), selectionInk }),
+    [theme, selectionInk]
+  )
+}
+
+/**
  * One frozen object, shared by every plugin: the components are stateless and
  * a per-plugin copy would only give React new identities to re-mount on.
  */
 const KIT: PluginKit = {
+  fileIcon,
+  FileView,
+  folderIcon,
   KeyHint,
   List: List as PluginKit['List'],
   Panel,
   Row,
-  useTheme: () => usePluginTheme() as unknown as Record<string, string>,
+  TextField,
+  useTheme: usePluginThemeTokens,
+  VirtualList: VirtualList as PluginKit['VirtualList'],
 }
 
 /** `GitFileEntry` narrowed to what a plugin has any business seeing. */
@@ -166,9 +201,13 @@ function describeFiles(files: readonly GitFileEntry[]): PluginGitFile[] {
   }))
 }
 
-/** The directory git writes run in: the project's, which is what the panel polls. */
+/**
+ * The checkout every git call runs in: the active workspace's. It is the one
+ * the panel polls — so `status()` — and the one `kit.FileView` draws from, so
+ * a path read from any of them names the same file in all the others.
+ */
 function requireRepoPath(): string {
-  const path = getCurrentProject(appStore.getState())?.projectPath
+  const path = getActiveWorkspacePath(getCurrentProject(appStore.getState()))
   if (path === undefined || path === '') throw new Error('no project with a path is open')
   return path
 }
@@ -207,6 +246,72 @@ const ENTER_BY_SCREEN = {
   stats: { type: 'enter-stats' },
 } as const satisfies Record<string, AppAction>
 
+/**
+ * `ctx.ui.input`: the host's text field, lent to one plugin at a time. The
+ * typing is the `plugin-input` modal's — buffer, cursor, Esc and ⏎ — and this
+ * is the plumbing back: each edit to `onChange`, the way it closed to
+ * `onSubmit` or `onCancel`.
+ *
+ * The two closing effects are registered on first use rather than up front, so
+ * a plugin that never asks for text does not list them among its effects.
+ */
+function buildInput(ctx: PluginContext): PluginInputApi {
+  const { id } = ctx
+  let current: PluginInputOptions | null = null
+  let heard: string | null = null
+  let wired = false
+
+  const finish = (submitted: boolean) => (payload: unknown) => {
+    const options = current
+    current = null
+    heard = null
+    const text = typeof payload === 'string' ? payload : ''
+    if (submitted) options?.onSubmit?.(text)
+    else options?.onCancel?.(text)
+  }
+
+  const wire = (): void => {
+    if (wired) return
+    wired = true
+    own(ctx, registerPluginEffect(id, actions.PLUGIN_INPUT_SUBMIT, finish(true)))
+    own(ctx, registerPluginEffect(id, actions.PLUGIN_INPUT_CANCEL, finish(false)))
+    own(
+      ctx,
+      appStore.subscribe((state) => {
+        const { modal } = state
+        if (current === null || modal.type !== 'plugin-input' || modal.pluginId !== id) return
+        const text = modal.editBuffer ?? ''
+        if (text === heard) return
+        heard = text
+        current.onChange?.(text)
+      })
+    )
+  }
+
+  const ours = (state: AppState): boolean =>
+    state.modal.type === 'plugin-input' && state.modal.pluginId === id
+
+  return {
+    close: () => {
+      current = null
+      heard = null
+      if (ours(appStore.getState())) dispatchGlobal({ type: 'close-modal' })
+    },
+    open: (options) => {
+      wire()
+      current = options
+      heard = options.initial ?? ''
+      dispatchGlobal({ initial: options.initial ?? '', pluginId: id, type: 'open-plugin-input' })
+    },
+    use: () => {
+      const modal = useAppStore((s) => s.modal)
+      if (modal.type !== 'plugin-input' || modal.pluginId !== id) return null
+      const value = modal.editBuffer ?? ''
+      return { cursor: modal.cursorPos ?? value.length, value }
+    },
+  }
+}
+
 function buildUi(ctx: PluginContext): PluginUiApi {
   const { id } = ctx
   return {
@@ -214,6 +319,15 @@ function buildUi(ctx: PluginContext): PluginUiApi {
       commit: async (input) => gitCommitStaged(requireRepoPath(), input),
       diff: async (path, options) => gitDiffOf(requireRepoPath(), path, options),
       discard: async (paths) => gitDiscard(requireRepoPath(), paths),
+      files: async () => {
+        const files = await listRepoFiles(requireRepoPath())
+        return files.map((file) => ({
+          added: file.added,
+          path: file.path,
+          removed: file.removed,
+          status: file.change?.status ?? null,
+        }))
+      },
       provideCommitMessage: (provider) => {
         // aimux's own provider yields to any plugin the user installs; see
         // `commit-message-provider.ts` for why the ranks exist.
@@ -244,6 +358,7 @@ function buildUi(ctx: PluginContext): PluginUiApi {
       },
       unstage: async (paths) => gitUnstage(requireRepoPath(), paths),
     },
+    input: buildInput(ctx),
     kit: KIT,
     layout: {
       close: (tabId) => {

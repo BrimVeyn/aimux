@@ -2,6 +2,7 @@ import { testRender } from '@opentui/react/test-utils'
 import { describe, expect, test } from 'bun:test'
 import { act } from 'react'
 
+import { buildContextPatch } from '../../src/git/file-view'
 import { PierreDiff } from '../../src/ui/components/git/diff-renderer'
 import { expandTabs, wrapCount } from '../../src/ui/components/git/diff-renderer/build-rows'
 
@@ -140,5 +141,52 @@ describe.each(['stacked', 'split'] as const)('%s diff rows', (view) => {
     const pane = await frameRows(160)
     check(await pane.resize(64))
     check(await pane.resize(120))
+  })
+})
+
+// A file read as it is goes through the same rows: one line number, no sign.
+describe('single file rows', () => {
+  const gutter = /^\s*\d+ /
+
+  async function frameRows(width: number): Promise<{
+    resize: (w: number) => Promise<string[]>
+    rows: string[]
+  }> {
+    const { captureCharFrame, renderOnce, resize } = await testRender(
+      <PierreDiff
+        cacheKey={`rows-single-${width}`}
+        diff={buildContextPatch('x.ts', `${LINES.join('\n')}\n`)}
+        path="x.ts"
+        themeId="t"
+        view="single"
+      />,
+      { height: 40, width }
+    )
+    await settle(renderOnce)
+    const cut = (frame: string): string[] => frame.split('\n').filter((r) => r.trimEnd() !== '')
+    return {
+      resize: async (w: number) => {
+        resize(w, 40)
+        await settle(renderOnce)
+        return cut(captureCharFrame())
+      },
+      rows: cut(captureCharFrame()),
+    }
+  }
+
+  function check(rows: readonly string[]): void {
+    const { blank, lines } = readBack(rows, gutter)
+    expect(blank).toBe(0)
+    expect(lines).toEqual(LINES.map((l) => expandTabs(l)))
+  }
+
+  test('wide and narrow panes keep every line, nothing blank, nothing cut', async () => {
+    check((await frameRows(160)).rows)
+    check((await frameRows(50)).rows)
+  })
+
+  test('the rows follow the pane when it is resized', async () => {
+    const pane = await frameRows(160)
+    check(await pane.resize(48))
   })
 })

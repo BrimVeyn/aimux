@@ -1,5 +1,6 @@
 import type { ModeId } from '@brimveyn/aimux-config'
-import type { ReactNode } from 'react'
+
+import { memo, type ReactNode } from 'react'
 
 import { registerHelpModeLabel } from '../input/keymap/help-entries'
 import { registerModeDerivation } from '../input/modes/bridge'
@@ -65,8 +66,14 @@ export function registerPluginView(view: PluginViewDefinition): () => void {
     // Claims input while this view is the one on screen. Registered here
     // rather than left to the plugin: forgetting it is not a subtle bug, it is
     // a view that swallows every keystroke.
+    // An open modal — the view's own text field among them — owns the keys
+    // while it is up, the same rule every built-in screen follows.
     registerModeDerivation((state) =>
-      state.focusMode === 'plugin-view' && state.activePluginView === view.id ? modeId : null
+      state.focusMode === 'plugin-view' &&
+      state.activePluginView === view.id &&
+      state.modal.type === null
+        ? modeId
+        : null
     ),
   ]
 
@@ -100,8 +107,13 @@ export function clearPluginViews(): void {
  * A missing view is not an error state worth a screen of its own — it happens
  * for one frame while a plugin reloads — so it renders nothing and lets the
  * next commit sort it out.
+ *
+ * Memoised, with no props: the app re-renders on every dispatch, and a view
+ * redrawn for each — a terminal's output, the git poll — is a view that
+ * cannot keep up with its own keys. It answers to the store, through the
+ * selectors here and the plugin's own `store.use()`.
  */
-export function PluginViewHost(): ReactNode {
+export const PluginViewHost = memo(function PluginViewHost(): ReactNode {
   const activeId = useAppStore((s) => s.activePluginView)
   useAppStore((s) => s.pluginRegistryVersion)
   const view = getPluginView(activeId)
@@ -114,4 +126,4 @@ export function PluginViewHost(): ReactNode {
       {view.render()}
     </box>
   )
-}
+})

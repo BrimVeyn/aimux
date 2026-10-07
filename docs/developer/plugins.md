@@ -167,16 +167,51 @@ plugin answers one question. Three rules make it safe to hand over:
   missing from PATH: a machine without it is exactly where a plugin writing
   commit messages is most useful.
 
-Alongside it, two read-only pieces for anything that reacts to the repository:
+Alongside it, three read-only pieces for anything that reacts to the repository:
 
 - `ctx.ui.git.status()` — the panel's last refresh, narrowed to
   `{ branch, ahead, behind, files }`. A snapshot of aimux's poll, not a fresh
   `git status`: it is what the user is looking at, and it is empty until a
   project with a path is open.
+- `ctx.ui.git.files()` — every file of the active workspace's checkout,
+  tracked and untracked, ignored ones left out, each with its status letter or
+  `null`, and the lines added and removed against HEAD for a changed one.
+  Read fresh from git, for a plugin that browses rather than reviews.
 - `git:workingTreeChanged` — emitted only when the tree actually moved. The
   poll runs every few seconds; a plugin woken on every tick is a plugin nobody
   keeps installed, so the decision uses the same working-tree hash auto-commit
   uses to know its suggestion went stale.
+
+`kit.FileView` is git mode's renderers handed to a plugin: give it a path from
+`git.files()` and it draws that file read-only — a changed file split against
+HEAD as git mode shows it, anything else once, with the same highlighting,
+wrapping, rendered Markdown, images and PDFs. It scrolls itself under the
+mouse; for keys, pass a `controller` ref and call `controller.current.scroll`
+from an action. Its scroll is its own (`DiffScrollContext` in
+`src/ui/git-view-controls.ts`), so the wheel over it never moves git mode.
+
+A list that can be long — a repository's files — is `kit.VirtualList`, not
+`kit.List`. `List` mounts every item, which is right for a picker and makes a
+tree of twenty thousand rows take seconds a keypress; `VirtualList` draws one
+line per item and only the lines on screen, keeps the cursor a few rows from
+the edge, and scrolls under the wheel without moving it. Its `focused` prop
+lifts the cursor's row instead of filling it while the keys are elsewhere.
+
+`kit.fileIcon(path)` and `kit.folderIcon(open)` are the Nerd Font glyphs git
+mode's sidebar draws (`src/ui/file-icons.ts`), each with the theme token to
+colour it in — a syntax token, never a status colour, so an icon cannot read
+as "changed". A plugin listing files uses them rather than a table of its own,
+and its list then matches git mode's.
+
+A view has keys, not text: `ctx.ui.input.open({ initial, onChange, onSubmit,
+onCancel })` lends it a line of input. It opens the `plugin-input` modal, whose
+mode (`modal.plugin-input`) passes typing through to the edit buffer and maps
+`esc` and `⏎` to two plugin effects (`$input.cancel`, `$input.submit`) under the
+plugin's id — so the callbacks run inside the plugin, like any action. The
+modal draws nothing: the plugin shows the text where it belongs, with
+`kit.TextField` fed by `ctx.ui.input.use()` (the value and cursor while open,
+`null` otherwise). The view's own derivation yields while any modal is up,
+which is what lets the keys reach the field.
 
 The UI's own events reach plugins through `src/ui/plugin-events-ref.ts`: the
 host publishes one emitter, and a call site emits without importing the kernel
@@ -280,23 +315,23 @@ attached by the UI host through the kernel's `extendContext` hook. The kernel
 itself stays host-agnostic — it knows how to build a context and how to dispose
 one, and nothing about what either process can offer.
 
-| Member                                              | What it registers                                   |
-| --------------------------------------------------- | --------------------------------------------------- |
-| `ctx.ui.widgets.register`                           | a bar widget, placed and resized like the built-ins |
-| `ctx.ui.views.register` / `.open` / `.close`        | a full-screen view that replaces the pane tree      |
-| `ctx.ui.modals.register` / `.open` / `.close`       | a modal, closed by the ordinary `close-modal`       |
-| `ctx.ui.settings.registerSection`                   | a settings section beyond the generated one         |
-| `ctx.ui.themes.register`                            | a theme, in the shipped JSON format                 |
-| `ctx.ui.themes.current` / `.onChange`               | the active palette and mode, outside React          |
-| `ctx.ui.settings.get` / `.watch`                    | one of aimux's own setting rows, by dotted id       |
-| `ctx.ui.statusBar.register`                         | a tile on the right of the status bar               |
-| `ctx.ui.panes.register` / `.open` / `.close`        | a leaf in the layout tree that is not a terminal    |
-| `ctx.ui.state.get` / `.subscribe` / `.use`          | tabs, the active tab, the project — read only       |
-| `ctx.ui.stats.registerPage`                         | a page on the stats screen                          |
-| `ctx.ui.toast`                                      | the usual three toast levels                        |
-| `ctx.ui.kit`                                        | `Panel`, `Row`, `List`, `KeyHint`, `useTheme`       |
-| `ctx.actions.register` / `.effect`                  | a named keyboard action, and the effect it runs     |
-| `ctx.store.reducer` / `.get` / `.use` / `.dispatch` | this plugin's slice of `AppState`                   |
+| Member                                              | What it registers                                         |
+| --------------------------------------------------- | --------------------------------------------------------- |
+| `ctx.ui.widgets.register`                           | a bar widget, placed and resized like the built-ins       |
+| `ctx.ui.views.register` / `.open` / `.close`        | a full-screen view that replaces the pane tree            |
+| `ctx.ui.modals.register` / `.open` / `.close`       | a modal, closed by the ordinary `close-modal`             |
+| `ctx.ui.settings.registerSection`                   | a settings section beyond the generated one               |
+| `ctx.ui.themes.register`                            | a theme, in the shipped JSON format                       |
+| `ctx.ui.themes.current` / `.onChange`               | the active palette and mode, outside React                |
+| `ctx.ui.settings.get` / `.watch`                    | one of aimux's own setting rows, by dotted id             |
+| `ctx.ui.statusBar.register`                         | a tile on the right of the status bar                     |
+| `ctx.ui.panes.register` / `.open` / `.close`        | a leaf in the layout tree that is not a terminal          |
+| `ctx.ui.state.get` / `.subscribe` / `.use`          | tabs, the active tab, the project — read only             |
+| `ctx.ui.stats.registerPage`                         | a page on the stats screen                                |
+| `ctx.ui.toast`                                      | the usual three toast levels                              |
+| `ctx.ui.kit`                                        | `Panel`, `Row`, `List`, `KeyHint`, `FileView`, `useTheme` |
+| `ctx.actions.register` / `.effect`                  | a named keyboard action, and the effect it runs           |
+| `ctx.store.reducer` / `.get` / `.use` / `.dispatch` | this plugin's slice of `AppState`                         |
 
 Two invariants are enforced by the host rather than asked of the plugin.
 

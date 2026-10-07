@@ -184,12 +184,15 @@ interface GitPaneConfig {
   initialTreeCompaction?: boolean
   path?: GitPanePathConfig
   diffCount?: GitPaneDiffCountConfig
+  icons?: GitPaneIconsConfig
   prefetchRadius?: number
 }
 
 type GitPanePathConfig = { enabled: false } | { enabled: true; pathFn?: (path: string) => string }
 
 type GitPaneDiffCountConfig = { enabled: boolean }
+
+type GitPaneIconsConfig = { enabled: boolean }
 ```
 
 Runtime behavior:
@@ -207,6 +210,9 @@ Runtime behavior:
   only the basename. When `enabled: true`, an optional `pathFn` rewrites the
   path before rendering (e.g. stripping a prefix).
 - `diffCount.enabled: false` hides the `+added / −removed` column.
+- `icons.enabled: false` drops the Nerd Font glyph beside each file and folder
+  (the folders get `▸`/`▾` back) — for a terminal font without them, where they
+  draw as boxes. Also a toggle in Settings › Git.
 - `prefetchRadius` is a regular config knob, not a persisted pane-state field.
 - The `initial*` fields are startup overrides. Current runtime pane state is
   still persisted in `aimux.json`, but typed config values take precedence on

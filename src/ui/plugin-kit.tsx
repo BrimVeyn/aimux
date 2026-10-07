@@ -1,10 +1,17 @@
 import type { ResolvedTuiTheme } from '@brimveyn/aimux-config'
+import type { PluginFileViewProps } from '@brimveyn/aimux-plugin'
 
-import { isValidElement, type ReactNode } from 'react'
+import { isValidElement, memo, type ReactNode, useCallback, useMemo } from 'react'
 
+import { useAppStore } from '../state/app-store'
+import { getActiveWorkspacePath, getCurrentProject } from '../state/project-workspaces'
+import { FileView as HostFileView } from './components/git/file-view/file-view'
+import { BareInput } from './components/primitives/bare-input'
 import { ListItem } from './components/primitives/list-item'
 import { Surface } from './components/primitives/surface'
+import { VirtualRows } from './components/primitives/virtual-rows'
 import { useTheme } from './theme'
+import { useThemeId } from './theme-store'
 
 /**
  * The primitive kit a plugin renders with.
@@ -170,6 +177,119 @@ export function List<T>({
   )
 }
 
+export interface VirtualListProps<T> {
+  items: readonly T[]
+  /** Index of the cursor's row, or -1 for none. The list keeps it in view. */
+  selectedIndex?: number
+  /** Stable key per item. Falls back to the index. */
+  keyOf?: (item: T, index: number) => string
+  /**
+   * One line per item, nothing taller. `selected` is true on the cursor's row
+   * while the list has focus — the row is filled then, and everything drawn on
+   * it takes `selectionInk`.
+   */
+  renderItem: (item: T, index: number, selected: boolean) => ReactNode
+  /** Shown instead of the list when `items` is empty. */
+  empty?: ReactNode
+  /**
+   * False while the keys are elsewhere: the cursor's row stays marked, lifted
+   * rather than filled, so the eye finds where it left off. True by default.
+   */
+  focused?: boolean
+  onSelect?: (index: number) => void
+  onHover?: (index: number) => void
+}
+
+interface VirtualRowProps {
+  children: ReactNode
+  fill: 'element' | 'primary' | null
+  index: number
+  onClickIndex?: (index: number) => void
+  onHoverIndex?: (index: number) => void
+}
+
+const VirtualRow = memo(function VirtualRow({
+  children,
+  fill,
+  index,
+  onClickIndex,
+  onHoverIndex,
+}: VirtualRowProps): ReactNode {
+  const t = usePluginTheme()
+  const handleClick = useMemo(
+    () => (onClickIndex === undefined ? undefined : () => onClickIndex(index)),
+    [index, onClickIndex]
+  )
+  const handleHover = useMemo(
+    () => (onHoverIndex === undefined ? undefined : () => onHoverIndex(index)),
+    [index, onHoverIndex]
+  )
+  let background: string | undefined
+  if (fill === 'primary') background = t.primary
+  else if (fill === 'element') background = t.backgroundElement
+  return (
+    <box
+      height={1}
+      flexShrink={0}
+      flexDirection="row"
+      overflow="hidden"
+      paddingLeft={1}
+      paddingRight={1}
+      backgroundColor={background}
+      onMouseDown={handleClick}
+      onMouseOver={handleHover}
+    >
+      {children}
+    </box>
+  )
+})
+
+/**
+ * A list of any length, one line per item. Only the rows on screen exist: a
+ * `List` mounts every item, which is right for a picker and makes a tree of
+ * twenty thousand files take seconds a keypress. The cursor is kept in view
+ * the way vim keeps it, a few rows from the edge, and the wheel scrolls
+ * without moving it.
+ */
+export function VirtualList<T>({
+  empty,
+  focused = true,
+  items,
+  keyOf,
+  onHover,
+  onSelect,
+  renderItem,
+  selectedIndex = -1,
+}: VirtualListProps<T>): ReactNode {
+  const t = usePluginTheme()
+  const keyAt = useCallback(
+    (index: number) => {
+      const item = items[index] as T
+      return keyOf?.(item, index) ?? String(index)
+    },
+    [items, keyOf]
+  )
+  const renderRow = useCallback(
+    (index: number) => {
+      const selected = index === selectedIndex
+      let fill: VirtualRowProps['fill'] = null
+      if (selected) fill = focused ? 'primary' : 'element'
+      return (
+        <VirtualRow fill={fill} index={index} onClickIndex={onSelect} onHoverIndex={onHover}>
+          {renderItem(items[index] as T, index, selected && focused)}
+        </VirtualRow>
+      )
+    },
+    [focused, items, onHover, onSelect, renderItem, selectedIndex]
+  )
+  if (items.length === 0) {
+    return empty === undefined ? null : paint(empty, t.textMuted)
+  }
+  return (
+    <VirtualRows count={items.length} cursor={selectedIndex} keyOf={keyAt} renderRow={renderRow} />
+  )
+}
+
 export interface KeyHintProps {
   /** `[{ keys: 'q', label: 'close' }, …]`, in the order they should read. */
   hints: readonly { keys: string; label: string }[]
@@ -194,4 +314,52 @@ export function KeyHint({ hints }: KeyHintProps): ReactNode {
       ))}
     </box>
   )
+}
+
+/**
+ * The checkout a plugin browses: the active workspace's, which is the one the
+ * agent is editing — the same directory git mode diffs.
+ */
+export function useBrowsePath(): string | null {
+  return useAppStore((s) => getActiveWorkspacePath(getCurrentProject(s)) ?? null)
+}
+
+/**
+ * Git mode's renderers on one file of that checkout. A function component in
+ * front of the forwardRef one: the kit's slots are plain calls, and the
+ * controller a plugin hands over is the ref.
+ */
+export function FileView({
+  controller,
+  markdown,
+  path,
+  prefer,
+  revision,
+}: PluginFileViewProps): ReactNode {
+  const cwd = useBrowsePath()
+  const themeId = useThemeId()
+  return (
+    <HostFileView
+      ref={controller}
+      cwd={cwd}
+      markdown={markdown}
+      path={path}
+      prefer={prefer}
+      revision={revision}
+      themeId={themeId}
+    />
+  )
+}
+
+/** A one-line field with a cursor: what aimux's own filters are drawn with. */
+export function TextField({
+  cursor,
+  placeholder,
+  value,
+}: {
+  cursor: number
+  placeholder?: string
+  value: string
+}): ReactNode {
+  return <BareInput cursorPos={cursor} placeholder={placeholder} value={value} />
 }

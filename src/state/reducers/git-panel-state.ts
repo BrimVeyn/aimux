@@ -8,7 +8,12 @@ import type {
 } from '../types'
 
 import { clampGitPaneRatio } from '../git-pane-sizing'
-import { activeGitFileFilter, filterGitFiles, reconcileSelectedGitEntryKey } from '../git-tree'
+import {
+  activeGitFileFilter,
+  filterGitFiles,
+  reconcileSelectedGitEntryKey,
+  visibleGitKeys,
+} from '../git-tree'
 import { clearDiffCacheForPaths } from './diff-cache'
 
 const SECTION_RANK: Record<GitFileSection, number> = {
@@ -129,13 +134,20 @@ export function reduceGitPanelState(state: AppState, action: AppAction): AppStat
       const prev = state.gitPanel
       const next = action.payload
       const sortedNext = sortFilesBySection(next.files)
+      const filter = activeGitFileFilter(state)
       const nextSelectedEntryKey = reconcileSelectedGitEntryKey(
-        filterGitFiles(sortedNext, activeGitFileFilter(state)),
+        filterGitFiles(sortedNext, filter),
         state.gitMode.collapsedFolders,
         state.gitPane.fileListMode,
         state.gitMode.selectedEntryKey,
         [],
-        state.gitPane.treeCompaction
+        state.gitPane.treeCompaction,
+        visibleGitKeys(
+          filterGitFiles(prev.files, filter),
+          state.gitMode.collapsedFolders,
+          state.gitPane.fileListMode,
+          state.gitPane.treeCompaction
+        )
       )
       if (
         prev.branch === next.branch &&

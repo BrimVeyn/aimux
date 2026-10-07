@@ -19,6 +19,9 @@ const TRANSITIONS: Record<BuiltinModeId, readonly ModeId[]> = {
   'modal.help.filtering': ['navigation'],
   'modal.new-tab.command-edit': ['navigation', 'modal.new-tab.editing-command'],
   'modal.new-tab.editing-command': ['navigation', 'modal.new-tab.command-edit'],
+  // Opened over a plugin's own screen and closed back onto it: the mode follows
+  // the modal, so no transition is ever asked for.
+  'modal.plugin-input': [],
   'modal.project-name': ['modal.project-picker.filtering', 'navigation'],
   'modal.project-picker.filtering': ['navigation', 'modal.project-name', 'modal.create-project'],
   'modal.quotas': ['navigation', 'terminal-input'],

@@ -293,6 +293,9 @@ function renderModal(
     case 'git-file-filter':
       // Drawn in place, as the diff sidebar's filter bar.
       return null
+    case 'plugin-input':
+      // Drawn by the plugin, where its field belongs.
+      return null
     case 'plugin-modal':
       return <PluginModalHost modalId={modal.modalId} props={modal.props} />
     case null:

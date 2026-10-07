@@ -139,6 +139,7 @@ const FROZEN_ROW_IDS = [
   'git.diffCount',
   'git.fetchBase',
   'git.fileListMode',
+  'git.icons',
   'git.prefetchRadius',
   'git.treeCompaction',
   'git.worktreeCopyFiles',

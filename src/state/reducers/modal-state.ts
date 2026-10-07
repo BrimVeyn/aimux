@@ -479,6 +479,20 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
           type: 'theme-picker',
         },
       }
+    // Focus is left alone: the field is drawn over the plugin's own screen, and
+    // closing it goes back to whatever that was.
+    case 'open-plugin-input':
+      return {
+        ...state,
+        modal: {
+          cursorPos: action.initial.length,
+          editBuffer: action.initial,
+          pluginId: action.pluginId,
+          projectTargetId: null,
+          selectedIndex: 0,
+          type: 'plugin-input',
+        },
+      }
     case 'open-plugin-modal':
       return {
         ...state,
@@ -553,7 +567,8 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
       if (
         closingType === 'help' ||
         closingType === 'workspace-move' ||
-        closingType === 'flash-jump'
+        closingType === 'flash-jump' ||
+        closingType === 'plugin-input'
       ) {
         return { ...state, modal: emptyModal() }
       }
