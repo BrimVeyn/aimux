@@ -201,15 +201,12 @@ function describeFiles(files: readonly GitFileEntry[]): PluginGitFile[] {
   }))
 }
 
-/** The directory git writes run in: the project's, which is what the panel polls. */
+/**
+ * The checkout every git call runs in: the active workspace's. It is the one
+ * the panel polls — so `status()` — and the one `kit.FileView` draws from, so
+ * a path read from any of them names the same file in all the others.
+ */
 function requireRepoPath(): string {
-  const path = getCurrentProject(appStore.getState())?.projectPath
-  if (path === undefined || path === '') throw new Error('no project with a path is open')
-  return path
-}
-
-/** The checkout `kit.FileView` draws from: the active workspace's. */
-function requireBrowsePath(): string {
   const path = getActiveWorkspacePath(getCurrentProject(appStore.getState()))
   if (path === undefined || path === '') throw new Error('no project with a path is open')
   return path
@@ -323,7 +320,7 @@ function buildUi(ctx: PluginContext): PluginUiApi {
       diff: async (path, options) => gitDiffOf(requireRepoPath(), path, options),
       discard: async (paths) => gitDiscard(requireRepoPath(), paths),
       files: async () => {
-        const files = await listRepoFiles(requireBrowsePath())
+        const files = await listRepoFiles(requireRepoPath())
         return files.map((file) => ({
           added: file.added,
           path: file.path,

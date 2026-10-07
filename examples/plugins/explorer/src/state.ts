@@ -218,9 +218,10 @@ export function reduce(
       const folds = { ...slice.folds, [slice.tab]: { open: false, set: {} } }
       const next = { ...slice, folds }
       const { rows } = rowsOf(next)
-      const row = rows.find(
-        (r) => r.kind === 'dir' && (r.path === top || r.path.startsWith(`${top}/`))
-      )
+      const row =
+        top === undefined
+          ? undefined
+          : rows.find((r) => r.kind === 'dir' && (r.path === top || r.path.startsWith(`${top}/`)))
       return row === undefined ? settle(next) : land(next, row)
     }
     case 'expandAll':

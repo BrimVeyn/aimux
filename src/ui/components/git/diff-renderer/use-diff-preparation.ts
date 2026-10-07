@@ -117,6 +117,16 @@ export function useDiffPreparation(
     setPreparing(false)
   }, [cacheKey, diff, path, requestOwner, themeId])
 
+  // Tokenising still running when the view goes away must not write back: the
+  // owner may already have told git mode to forget this key, and a late merge
+  // would put the entry back with nothing left to clear it.
+  useEffect(
+    () => () => {
+      requestVersionRef.current += 1
+    },
+    []
+  )
+
   useEffect(() => {
     if (cachedParsed) return
 

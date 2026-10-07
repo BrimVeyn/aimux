@@ -1,4 +1,5 @@
 import { $ } from 'bun'
+import { posix } from 'node:path'
 
 import type { GitFileEntry } from '../state/types'
 
@@ -36,17 +37,30 @@ export function changesByPath(entries: readonly GitFileEntry[]): Map<string, Git
   return out
 }
 
-async function statusEntries(cwd: string, path?: string): Promise<GitFileEntry[]> {
-  const result =
-    path === undefined
-      ? await $`git -C ${cwd} -c core.quotePath=false status --porcelain=v2 -z --untracked-files=all`
-          .quiet()
-          .nothrow()
-      : await $`git -C ${cwd} -c core.quotePath=false status --porcelain=v2 -z --untracked-files=all -- ${path}`
-          .quiet()
-          .nothrow()
-  if (result.exitCode !== 0) return []
-  return parsePorcelainEntries(result.text(), NO_NUMSTAT, NO_NUMSTAT)
+/**
+ * `cwd` can be a folder inside a repository rather than its top. `ls-files`
+ * answers relative to `cwd`, but status always answers relative to the top:
+ * its paths are brought back to `cwd`, and the pathspec keeps out what lies
+ * outside it.
+ */
+async function statusEntries(cwd: string, path = '.'): Promise<GitFileEntry[]> {
+  const [result, prefix] = await Promise.all([
+    $`git -C ${cwd} -c core.quotePath=false status --porcelain=v2 -z --untracked-files=all -- ${path}`
+      .quiet()
+      .nothrow(),
+    $`git -C ${cwd} rev-parse --show-prefix`.quiet().nothrow(),
+  ])
+  if (result.exitCode !== 0 || prefix.exitCode !== 0) return []
+  const top = prefix.text().trim()
+  const entries = parsePorcelainEntries(result.text(), NO_NUMSTAT, NO_NUMSTAT)
+  if (top === '') return entries
+  return entries.map((entry) => ({
+    ...entry,
+    path: posix.relative(top, entry.path),
+    ...(entry.renamedFrom === undefined
+      ? {}
+      : { renamedFrom: posix.relative(top, entry.renamedFrom) }),
+  }))
 }
 
 /** What has changed about one file, or null when nothing has. */
@@ -69,7 +83,10 @@ export async function listRepoFiles(cwd: string): Promise<RepoFile[]> {
     statusEntries(cwd),
     // `--no-renames`: a renamed file is counted under its new path, which is
     // the one listed. No HEAD yet (a fresh repository) is no counts, not an error.
-    $`git -C ${cwd} -c core.quotePath=false diff HEAD --numstat --no-renames`.quiet().nothrow(),
+    // `--relative`: counted under the same `cwd`-relative paths as the rest.
+    $`git -C ${cwd} -c core.quotePath=false diff HEAD --numstat --no-renames --relative`
+      .quiet()
+      .nothrow(),
   ])
   if (listed.exitCode !== 0) throw new Error(listed.stderr.toString().trim() || 'not a repository')
   const changes = changesByPath(entries)

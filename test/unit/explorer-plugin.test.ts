@@ -231,6 +231,19 @@ describe('reducer', () => {
     expect(rowsDrawn(shut)).toEqual(['▸ docs/', '▸ lib/', '▸ src/', 'README.md', 'zeta.ts'])
   })
 
+  test('W on a top-level file keeps the cursor there, whatever the folders are called', () => {
+    const files = [...FILES, file('undefined/deep/x.ts')]
+    const onReadme = run(
+      ['loaded', files],
+      ['tab'],
+      ['expandAll'],
+      ['filter', 'README'],
+      ['filter', '']
+    )
+    expect(onReadme.cursor).toBe('f:README.md')
+    expect(reduce(onReadme, { actionId: 'collapseAll' }).cursor).toBe('f:README.md')
+  })
+
   test('a search narrows as it is typed; cleared, the file found stays on screen', () => {
     const slice = run(['loaded', FILES], ['tab'], ['filter', 'lst'])
     expect(slice.cursor).toBe('f:src/ui/list.tsx')

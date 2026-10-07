@@ -98,6 +98,19 @@ describe('listRepoFiles', () => {
     expect(await fileChange(repo, 'src/clean.ts')).toBeNull()
     expect((await fileChange(repo, 'notes.txt'))?.section).toBe('untracked')
   })
+
+  test("from a folder inside the repository, paths are the folder's and nothing outside it shows", async () => {
+    const files = await listRepoFiles(join(repo, 'src'))
+    const byPath = Object.fromEntries(
+      files.map((f) => [f.path, [f.change?.status ?? null, f.added, f.removed]])
+    )
+    expect(byPath).toEqual({
+      'added.ts': ['A', 1, 0],
+      'changed.ts': ['M', 1, 1],
+      'clean.ts': [null, null, null],
+    })
+    expect((await fileChange(join(repo, 'src'), 'changed.ts'))?.status).toBe('M')
+  })
 })
 
 describe('loadFileView', () => {
