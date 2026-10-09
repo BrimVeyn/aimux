@@ -318,6 +318,10 @@ export async function runDeleteWorkspace(
   } else if (isAimuxTemp && isInsideAimuxWorktreeRoot(workspace.path)) {
     await assertSafeAimuxWorktreePath(workspace.path)
     await removeGitWorktree({ force, repoPath, targetPath: workspace.path })
+  } else if (workspace.source === 'external') {
+    // Dropping only the record is not a delete: the worktree is still in
+    // `git worktree list`, so the next load adopts it right back.
+    await removeGitWorktree({ force, repoPath, targetPath: workspace.path })
   } else if (workspace.source === 'aimux-temp' || workspace.createdByAimux) {
     throw new Error(`refusing unsafe workspace delete: ${workspace.path}`)
   }
@@ -472,7 +476,7 @@ export function removeWorkspaceRecordFromProject(
 
 export function isForceableWorkspaceDeleteError(message: string): boolean {
   // `force delete` is the marker `removeGitWorktree` appends to every refusal
-  // git raises: matching git's own wording never worked, since a broken worktree
+  // git raises inside the Aimux worktree root: matching git's own wording never worked, since a broken worktree
   // link fatals differently ("is not a working tree", "validation failed", …)
   // depending on which part of the link broke.
   return /active assistant tabs|dirty|uncommitted|modified|untracked|not clean|contains.*changes|force delete/i.test(

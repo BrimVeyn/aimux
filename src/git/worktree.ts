@@ -215,9 +215,10 @@ export async function removeGitWorktree({
   targetPath: string
   force: boolean
 }): Promise<void> {
-  if (!isInsideAimuxWorktreeRoot(targetPath)) {
-    throw new Error(`refusing to delete worktree outside Aimux worktree root: ${targetPath}`)
-  }
+  // git itself only removes linked worktrees (never the main checkout), so a
+  // worktree aimux adopted rather than created goes through the same command.
+  // Only our own rm fallback below is pinned to the Aimux worktree root.
+  const owned = isInsideAimuxWorktreeRoot(targetPath)
   const result = force
     ? await $`git -C ${repoPath} worktree remove --force ${targetPath}`.quiet().nothrow()
     : await $`git -C ${repoPath} worktree remove ${targetPath}`.quiet().nothrow()
@@ -231,19 +232,20 @@ export async function removeGitWorktree({
   // git refuses on states it cannot repair — a half-finished removal or a moved
   // repo leaves a directory git no longer links to ("is not a working tree"),
   // and no retry ever fixes it, so the row was undeletable forever. Force means
-  // "delete it regardless": finish the job ourselves. The path guard above
-  // already pinned the target inside the Aimux worktree root.
-  if (force) {
+  // "delete it regardless": finish the job ourselves — but only inside the
+  // Aimux worktree root, where nothing else owns the directory.
+  if (force && owned) {
     await rm(targetPath, { force: true, recursive: true })
     await $`git -C ${repoPath} worktree prune`.quiet().nothrow()
     return
   }
-  // Every refusal git can raise here is force-recoverable — the directory lives
-  // under the Aimux worktree root and nothing else owns it — so the message
-  // carries the offer, and `isForceableWorkspaceDeleteError` keys off that
-  // phrase instead of trying to enumerate git's wording.
+  // Every refusal git can raise on an owned directory is force-recoverable, so
+  // the message carries the offer, and `isForceableWorkspaceDeleteError` keys
+  // off that phrase instead of trying to enumerate git's wording. Outside the
+  // root git's own message stands: a dirty tree still matches, a main checkout
+  // or a broken link does not.
   const stderr = result.stderr.toString().trim() || 'failed to remove git worktree'
-  throw new Error(`${stderr} — force delete to remove it anyway`)
+  throw new Error(owned ? `${stderr} — force delete to remove it anyway` : stderr)
 }
 
 export async function listGitWorktrees(repoPath: string): Promise<GitWorktreeInfo[]> {
