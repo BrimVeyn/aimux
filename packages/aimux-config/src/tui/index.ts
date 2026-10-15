@@ -9,7 +9,7 @@ export {
   themeIds,
   TUI_THEMES,
 } from './registry'
-export { type ClaudeThemeFile, resolveClaudeTheme, resolveTuiTheme } from './resolve'
+export { resolveTuiTheme } from './resolve'
 export { type TuiShikiOptions, tuiThemeToShiki } from './shiki'
 export { TUI_COLOR_TOKENS, type TuiColorToken } from './tokens'
 export type { ResolvedTuiTheme, RGBA, ThemeMode, TuiColorValue, TuiThemeJson } from './types'

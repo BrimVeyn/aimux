@@ -163,50 +163,6 @@ VSCode keys:
 | `diffAddBg`      | `diffEditor.insertedLineBackground`     |
 | `diffRemoveBg`   | `diffEditor.removedLineBackground`      |
 
-## Beta — Harmonize Claude Code colors
-
-Aimux can push the active theme into Claude Code itself so the assistant's
-output matches the rest of the app. Off by default.
-
-```ts
-// aimux.config.ts
-export default defineConfig({
-  theme: {
-    initialId: 'aimux',
-    beta: {
-      harmonizeClaudeTheme: true,
-    },
-  },
-})
-```
-
-When the flag is on:
-
-- aimux writes `~/.claude/themes/aimux.json` from the resolved aimux palette.
-- aimux sets `"theme": "custom:aimux"` in `~/.claude/settings.json` (other
-  fields preserved, write is atomic).
-- Switching theme inside aimux rewrites the file. Claude Code watches its
-  themes dir and repaints live without restarting the session.
-
-Mapping (Claude token → aimux token): `claude` → `accent`, `error` → `error`,
-`success` → `success`, `warning` → `warning`, `planMode` → `info`,
-`bashBorder` → `warning`, `promptBorder` → `border`, `diffAdded` →
-`diffAddedBg`, `diffRemoved` → `diffRemovedBg`,
-`userMessageBackground` → `backgroundPanel`, `text` → `text`,
-`inactive` → `textMuted`. Tokens we don't override (Shimmer variants, dim
-diffs, subagent colors) fall through to Claude's `dark`/`light` preset.
-
-Requirements: Claude Code v2.1.118 or later. Limits: Claude's truecolor
-escapes (24-bit hex) bypass the theme — those colors stay native.
-
-To revert: turn the flag off and either delete `~/.claude/themes/aimux.json`
-or pick a different theme via Claude's `/theme` command.
-
-> **Note**: while the flag is on, aimux re-asserts `theme: "custom:aimux"`
-> in `~/.claude/settings.json` on every launch. Picking a different theme
-> via Claude's `/theme` command will be reverted next time aimux starts.
-> Disable the flag first if you want to use Claude's own theme picker.
-
 ## Beta — Re-tokenize Claude code blocks (experimental)
 
 Claude Code's syntax highlighting (Monokai-Extended) is hardcoded and
@@ -219,7 +175,6 @@ re-colors code blocks with the active aimux theme via shiki.
 ```ts
 theme: {
   beta: {
-    harmonizeClaudeTheme: true,
     experimentalSyntaxHighlight: true,
   },
 },

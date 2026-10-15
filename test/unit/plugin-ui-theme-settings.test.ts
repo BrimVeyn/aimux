@@ -76,10 +76,10 @@ describe('ctx.ui.themes outside React', () => {
 
 describe('ctx.ui.settings against aimux own rows', () => {
   test('get reads a row by the id the user writes in their config', () => {
-    settingsStore.setState({ values: { 'theme.beta.harmonizeClaudeTheme': true } })
+    settingsStore.setState({ values: { 'theme.beta.experimentalActivitySprites': true } })
     const { ui } = harness()
 
-    expect(ui.settings.get('theme.beta.harmonizeClaudeTheme')).toBe(true)
+    expect(ui.settings.get('theme.beta.experimentalActivitySprites')).toBe(true)
     expect(ui.settings.get('nothing.set.here')).toBeUndefined()
   })
 

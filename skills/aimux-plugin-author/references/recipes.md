@@ -115,7 +115,7 @@ For the case where your plugin must agree with aimux about something the user
 already set. `watch` fires immediately as well as on change.
 
 ```ts
-ctx.ui.settings.watch('theme.beta.harmonizeClaudeTheme', (value) => {
+ctx.ui.settings.watch('integrations.claudeHooks', (value) => {
   if (value === true) start()
   else stop()
 })

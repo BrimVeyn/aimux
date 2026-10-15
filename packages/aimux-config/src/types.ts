@@ -318,13 +318,7 @@ export interface AimuxThemeConfig {
   initialMode?: ThemeMode
   /** @deprecated Use `initialMode` instead. */
   mode?: ThemeMode
-  /**
-   * Beta — bridge the active aimux theme into Claude Code by writing
-   * `~/.claude/themes/aimux.json` and selecting it in `~/.claude/settings.json`.
-   * Off by default. Requires Claude Code v2.1.118 or later.
-   */
   beta?: {
-    harmonizeClaudeTheme?: boolean
     /**
      * Draw each agent state (idle, working, waiting, done) as a small animated
      * sprite rather than a spinner and a set of dots. Needs a terminal that
@@ -487,7 +481,6 @@ export interface ResolvedConfig {
         initialId?: string
         initialMode?: ThemeMode
         beta?: {
-          harmonizeClaudeTheme?: boolean
           experimentalSyntaxHighlight?: boolean
         }
       }
