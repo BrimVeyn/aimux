@@ -33,9 +33,9 @@ The section rail stays on the left while the settings form one continuous list.
 `h` and `l` always change column, never the value — a number row would otherwise
 make them ambiguous.
 
-Every setting carries its explanation under its label, at all times rather than
-only when selected: a row that grows a line when you land on it shifts everything
-below, and the list moves under the cursor the whole way down.
+Each setting is one line: its label, and its value right beside it. What the
+selected setting does, and what it can be set to, is shown in a fixed-height box
+at the foot of the screen — fixed so the list never moves under the cursor.
 
 All of it works with the mouse. Clicking a section selects it; clicking a setting
 selects **and** changes it, because a checkbox you have to select first and click
@@ -61,8 +61,7 @@ Settings that are a view over something else (bar widths, the theme, the launch
 commands) have neither mark and nothing to reset: their value lives with the thing
 that owns it.
 
-A toggle reads `●` when it is on and `○` when it is off, lit or muted to match.
-Both are one cell wide in a Latin-width terminal.
+A toggle reads `● on` or `○ off`, and a choice reads `‹ value ›`.
 
 The settings themselves are held to a share of the window rather than stretched
 across it, so a value stays next to the label it belongs to instead of drifting to

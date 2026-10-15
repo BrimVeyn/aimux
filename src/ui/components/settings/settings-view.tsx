@@ -14,19 +14,22 @@ import { useScrollActiveIntoView } from '../../hooks/use-scroll-active-into-view
 import { useSelectionInk } from '../../selection-ink'
 import { useTheme } from '../../theme'
 import { ListItem } from '../primitives/list-item'
-import { Muted, Section, TileRow } from '../stats/shared'
+import { Muted, Section } from '../stats/shared'
 import { SettingsFooter } from './settings-footer'
-import { CONFIG_FILE_MARK, SettingsRow, TOUCHED_MARK } from './settings-row'
+import { SettingsRow } from './settings-row'
 import { SettingsSearchBar } from './settings-search-bar'
 
 const COLUMN_CONTENT_OPTIONS = { flexDirection: 'column' as const, gap: 0 }
-
-const SETTINGS_GLYPH = '\u{2699}'
 
 /** One padding column either side, the same inset the stats pages sit in. */
 const PAGE_PAD = 1
 /** Matches the bar's own gutter, so the nav and a bar line up to the column. */
 const NAV_GUTTER = 2
+/**
+ * The widest the rows run. A setting is a label and a value read together, and
+ * across a wide terminal the eye loses the line between the two.
+ */
+const CONTENT_MAX = 80
 
 /** A section and the rows it owns, each keeping the index the cursor holds. */
 interface Group {
@@ -90,8 +93,6 @@ export const SettingsView = memo(function SettingsView() {
   // when a plugin loads, fails or is toggled — none of which touches the
   // settings store.
   const pluginRevision = usePluginStore((s) => s.revision)
-  const touchedCount = useSettingsStore((s) => s.touched.size)
-  const configCount = useSettingsStore((s) => s.fromConfigFile.size)
   // The section list stands exactly where the left bar stands. Its configured
   // width, not `getBarWidth`: a hidden bar still says how wide the sidebar is.
   const navWidth = useAppStore((s) => clampBarWidth(s.bars.left.width))
@@ -137,28 +138,10 @@ export const SettingsView = memo(function SettingsView() {
     dispatchGlobal({ type: 'exit-settings' })
   }, [])
 
-  // The headline row doubles as the legend for the two marks the rows wear —
-  // the counts are the only reason anyone would need to know what they mean.
-  const tiles = useMemo(
-    () =>
-      [
-        { glyph: SETTINGS_GLYPH, label: 'settings', value: String(hits.length) },
-        // A mark no row is wearing needs no legend, and a count of zero is not
-        // news — so the tile only exists while the mark does.
-        touchedCount === 0
-          ? null
-          : { glyph: TOUCHED_MARK, label: 'changed', value: String(touchedCount) },
-        configCount === 0
-          ? null
-          : { glyph: CONFIG_FILE_MARK, label: 'from config', value: String(configCount) },
-      ].filter((tile) => tile !== null),
-    [hits.length, touchedCount, configCount]
-  )
-
   // The same gutter the bar draws between itself and the terminal, so the two
   // views line up to the column.
   const navContentWidth = Math.max(1, navWidth - NAV_GUTTER)
-  const usable = Math.max(24, dimensions.width - navWidth - 2 - PAGE_PAD * 2)
+  const usable = Math.min(CONTENT_MAX, Math.max(24, dimensions.width - navWidth - 2 - PAGE_PAD * 2))
 
   return (
     <box flexDirection="row" flexGrow={1} overflow="hidden">
@@ -210,7 +193,7 @@ export const SettingsView = memo(function SettingsView() {
       <box padding={1} flexDirection="column" flexGrow={1} backgroundColor={t.background}>
         {/* Outside the scroll: the way to find a setting should not be a thing
             you have to scroll back up to. */}
-        <box flexShrink={0} paddingLeft={PAGE_PAD} paddingRight={PAGE_PAD} paddingTop={1}>
+        <box flexShrink={0} paddingLeft={PAGE_PAD} paddingRight={PAGE_PAD} paddingBottom={1}>
           <SettingsSearchBar width={usable} />
         </box>
         <scrollbox
@@ -221,19 +204,10 @@ export const SettingsView = memo(function SettingsView() {
           contentOptions={COLUMN_CONTENT_OPTIONS}
         >
           <box flexDirection="column" paddingLeft={PAGE_PAD} paddingRight={PAGE_PAD}>
-            <TileRow tiles={tiles} usable={usable} />
-            <box height={1} flexShrink={0} />
             {current === undefined ? (
               <Muted>Nothing to configure here yet.</Muted>
             ) : (
-              <Section
-                glyph={current.glyph}
-                rule={false}
-                title={current.label}
-                // Pinned to the same right edge every note on the screen lands on.
-                note={String(current.rows.length)}
-                width={usable}
-              >
+              <Section glyph={current.glyph} rule={false} title={current.label} width={usable}>
                 {current.note === '' ? null : (
                   <box width={usable} paddingBottom={1}>
                     <text fg={t.textMuted} selectable={false}>
@@ -241,7 +215,7 @@ export const SettingsView = memo(function SettingsView() {
                     </text>
                   </box>
                 )}
-                <box flexDirection="column" gap={1}>
+                <box flexDirection="column">
                   {current.rows.map(([index, hit]) => (
                     <SettingsRow
                       key={hit.row.id}

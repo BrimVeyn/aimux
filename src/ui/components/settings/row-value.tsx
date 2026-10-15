@@ -8,9 +8,9 @@ import { useAppStore } from '../../../state/app-store'
 import { type ResolvedTuiTheme, useTheme } from '../../theme'
 import { truncate } from '../../truncate'
 
-/** Filled means on. Both are one cell wide in a Latin-width terminal. */
-const ON = '●'
-const OFF = '○'
+/** Filled means on, and the word says it again for a row whose fill ate the colour. */
+const ON = '● on'
+const OFF = '○ off'
 
 /** What a row shows on its right edge, per kind. */
 export function formatValue(row: SettingRow, value: SettingValue): string {
@@ -19,7 +19,7 @@ export function formatValue(row: SettingRow, value: SettingValue): string {
       return value === true ? ON : OFF
     case 'select': {
       const option = row.options.find((entry) => entry.value === value)
-      return `${option?.label ?? String(value)} ›`
+      return `‹ ${option?.label ?? String(value)} ›`
     }
     case 'number':
       return String(value)
