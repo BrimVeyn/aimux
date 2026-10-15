@@ -41,7 +41,10 @@ const BUILTIN_WIDGETS: Record<string, WidgetEntry> = {
     label: 'Projects',
     render: (contentWidth) => <ProjectList contentWidth={contentWidth} />,
   },
-  setup: { label: 'Setup', render: () => <SetupWidget /> },
+  setup: {
+    label: 'Setup',
+    render: (contentWidth) => <SetupWidget contentWidth={contentWidth} />,
+  },
 }
 
 const pluginWidgets = new Map<string, WidgetEntry>()
