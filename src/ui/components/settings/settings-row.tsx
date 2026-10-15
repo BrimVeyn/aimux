@@ -25,7 +25,7 @@ const ROW_CHROME = 6
  * right after the labels, not across the screen from them. (`Auto-rename
  * minimum words` is the longest at 25.)
  */
-const LABEL_MAX = 28
+export const LABEL_MAX = 28
 
 interface SettingsRowProps {
   row: SettingRow
