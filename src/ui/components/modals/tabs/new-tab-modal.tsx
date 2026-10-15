@@ -5,10 +5,13 @@ import type { AssistantId } from '../../../../state/types'
 import { getAllAssistantOptions, getAssistantOption } from '../../../../pty/command-registry'
 import { dispatchGlobal, runSideEffectGlobal } from '../../../../state/dispatch-ref'
 import { getNewTabAssistantOptions } from '../../../../state/selectors'
+import { useWorkspaceCreateProgress } from '../../../../state/workspace-create-store'
+import { useBusySpinner } from '../../../hooks/use-busy-spinner'
 import { useSelectionInk } from '../../../selection-ink'
 import { useTheme } from '../../../theme'
 import { uiTokens } from '../../../ui-tokens'
 import { Form, TextField } from '../shared/form'
+import { ModalShell } from '../shared/modal-shell'
 import { Picker, type PickerItem } from '../shared/picker'
 
 interface NewTabModalProps {
@@ -24,6 +27,8 @@ interface NewTabModalProps {
    * A shell cannot take a prompt, so Terminal is hidden only when there is one.
    */
   pendingPrompt: string | null
+  /** An assistant was picked and waits for the `<C-p>` worktree to land. */
+  launching: boolean
 }
 
 export function NewTabModal({
@@ -32,11 +37,14 @@ export function NewTabModal({
   editBuffer,
   editingCommand,
   filter,
+  launching,
   pendingPrompt,
   selectedIndex,
 }: NewTabModalProps) {
   const t = useTheme()
   const ink = useSelectionInk()
+  const spinner = useBusySpinner(launching)
+  const progress = useWorkspaceCreateProgress()
   const excludeTerminal = pendingPrompt != null && pendingPrompt.trim() !== ''
   const footerText =
     pendingPrompt == null
@@ -79,6 +87,43 @@ export function NewTabModal({
       }),
     [customCommands, filtered, ink, selectedIndex, t]
   )
+
+  if (launching) {
+    return (
+      <ModalShell
+        title="New tab"
+        keybindsModeId="modal.new-tab.launching"
+        width={uiTokens.modalWidth.md}
+        footer={<text fg={t.textMuted}>The tab opens as soon as it is ready</text>}
+      >
+        {progress.steps.length === 0 ? (
+          <text fg={t.warning}>{spinner} Preparing…</text>
+        ) : (
+          progress.steps.map((step, index) => {
+            if (index < progress.done) {
+              return (
+                <text key={step} fg={t.success}>
+                  ✓ {step}
+                </text>
+              )
+            }
+            if (index === progress.done) {
+              return (
+                <text key={step} fg={t.warning}>
+                  {spinner} {step}
+                </text>
+              )
+            }
+            return (
+              <text key={step} fg={t.textMuted}>
+                {`  ${step}`}
+              </text>
+            )
+          })
+        )}
+      </ModalShell>
+    )
+  }
 
   if (editingCommand !== null) {
     const option = options.find((o) => o.id === editingCommand) ?? getAssistantOption(0)

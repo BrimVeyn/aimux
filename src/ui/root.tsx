@@ -113,6 +113,7 @@ function renderModal(
           editingCommand={modal.type === 'new-tab' ? modal.editingCommand : null}
           editBuffer={modal.editBuffer ?? ''}
           pendingPrompt={modal.type === 'new-tab' ? (modal.pendingWorkspace?.prompt ?? null) : null}
+          launching={modal.type === 'new-tab' && modal.launching === true}
         />
       )
     case 'create-workspace':

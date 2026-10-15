@@ -404,6 +404,9 @@ export function getDefaultKeymapConfig(): ResolvedKeymapConfig {
         .passthrough()
     )
 
+    // Waiting for the `<C-p>` worktree: the tab opens on its own once it lands.
+    .mode('modal.new-tab.launching', (m) => m.map('<Esc>', actions.closeModal, 'Hide'))
+
     .mode('modal.new-tab.editing-command', (m) =>
       m
         .map('<Esc>', actions.cancelEditCustomCommand, 'Cancel')

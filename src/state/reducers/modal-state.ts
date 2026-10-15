@@ -769,6 +769,10 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
         },
       }
     }
+    case 'start-new-tab-launch': {
+      if (state.modal.type !== 'new-tab') return state
+      return { ...state, modal: { ...state.modal, launching: true } }
+    }
     case 'cancel-command-edit': {
       if (state.modal.type === 'new-tab' && state.modal.editingCommand !== null) {
         return {
