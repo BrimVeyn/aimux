@@ -111,7 +111,6 @@ function resolveTheme(userConfig: AimuxUserConfig['theme']): ResolvedConfig['the
     beta: userConfig.beta
       ? {
           experimentalSyntaxHighlight: userConfig.beta.experimentalSyntaxHighlight === true,
-          harmonizeClaudeTheme: userConfig.beta.harmonizeClaudeTheme === true,
         }
       : undefined,
     initialId: userConfig.initialId,

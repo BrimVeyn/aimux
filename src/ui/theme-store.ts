@@ -136,9 +136,9 @@ export function subscribeThemeChanges(
     if (s.id === lastId && s.mode === lastMode) return
     lastId = s.id
     lastMode = s.mode
-    // Pass base theme (transparent=false): the only subscriber today is the
-    // Claude Code theme bridge, which has no transparency concept and wants
-    // the resolved palette.
+    // Pass base theme (transparent=false): the subscriber is the plugin API's
+    // `themes.onChange`, whose snapshot is the resolved palette with no
+    // transparency concept.
     listener(derive(s.id, s.mode, false), s.mode)
   })
 }

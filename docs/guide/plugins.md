@@ -106,12 +106,12 @@ what you asked for.
 
 Today those are:
 
-| Id                  | What it does                                                        |
-| ------------------- | ------------------------------------------------------------------- |
-| `aimux.claude`      | Writes aimux's theme and activity hooks into Claude Code's settings |
-| `aimux.ai-usage`    | The Claude/Codex quota tile in the status bar, and its polling      |
-| `aimux.auto-rename` | Names a tab after the first thing you ask its agent                 |
-| `aimux.auto-commit` | Writes the commit message aimux suggests, by asking your assistant  |
+| Id                  | What it does                                                       |
+| ------------------- | ------------------------------------------------------------------ |
+| `aimux.claude`      | Writes aimux's activity hooks into Claude Code's settings          |
+| `aimux.ai-usage`    | The Claude/Codex quota tile in the status bar, and its polling     |
+| `aimux.auto-rename` | Names a tab after the first thing you ask its agent                |
+| `aimux.auto-commit` | Writes the commit message aimux suggests, by asking your assistant |
 
 `aimux.ai-usage` is the one that ships **off**: it reads the Claude keychain
 entry and calls two OAuth endpoints, so it is asked for rather than arrived at.

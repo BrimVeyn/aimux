@@ -162,7 +162,6 @@ const FROZEN_ROW_IDS = [
   'experimental.spriteFolder',
   'theme.beta.experimentalActivitySprites',
   'theme.beta.experimentalSyntaxHighlight',
-  'theme.beta.harmonizeClaudeTheme',
 ]
 
 test('no row id changes by accident', () => {
