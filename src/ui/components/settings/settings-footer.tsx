@@ -1,50 +1,27 @@
-import { memo, useCallback } from 'react'
+import { memo } from 'react'
 
 import type { SettingRow } from '../../../settings/types'
 
 import { rowMarks } from '../../../settings/row-marks'
 import { readRow, storedRow, useSettingsStore } from '../../../settings/settings-store'
 import { useAppStore } from '../../../state/app-store'
-import { dispatchGlobal } from '../../../state/dispatch-ref'
 import { useTheme } from '../../theme'
 import { truncate } from '../../truncate'
 import { describeValue } from './row-value'
 
 /**
- * Everything the rows used to carry on a second line of their own, moved to the
- * foot of the screen and shown for the selected row only.
+ * What the selected row does, and what it can be set to — said once, at the foot
+ * of the screen, for the row you are on, instead of under every row at once.
  *
- * Three lines, always, whatever the row is: a footer that grows and shrinks
- * moves the list above it, and a list that shifts while you walk down it is the
- * thing this screen was rebuilt to stop doing.
+ * Fixed height whatever the row is: a footer that grows and shrinks moves the
+ * list above it, and a list that shifts while you walk down it is unusable. The
+ * keys are not here — the keybind overlay already lists them.
  */
 
-/**
- * `[key, what it does]`, so the keys can wear the theme and the prose cannot.
- *
- * Cut to what works on the row you are standing on: `←/→` does nothing to a
- * text field, and a hint for a key that does nothing is worse than no hint.
- */
-function hintsFor(row: SettingRow | null): [string, string][] {
-  const hints: [string, string][] = []
-  if (row?.kind === 'number' || row?.kind === 'select' || row?.kind === 'toggle') {
-    hints.push(['←/→', 'adjust'])
-  }
-  if (row != null && row.kind !== 'info') {
-    let action = 'change'
-    if (row.kind === 'keybind') action = 'capture'
-    else if (row.kind === 'number' || row.kind === 'text') action = 'type a value'
-    hints.push(['↵', action])
-  }
-  hints.push(['r', 'reset'], ['/', 'search'], ['} {', 'section'], ['esc', 'close'])
-  return hints
-}
+/** Rows the description may wrap onto before it is cut. */
+const DESCRIPTION_ROWS = 2
 
-/**
- * What the row itself does not say. Not its description — the row carries that
- * under its own label now — but where its value comes from and when it takes
- * effect, which belong to the row you are on rather than to the setting.
- */
+/** Where the value comes from and when it takes effect. */
 function notesFor(row: SettingRow, fromConfigFile: boolean): string {
   if (fromConfigFile) return 'set in aimux.config.ts — comes back on restart'
   return storedRow(row)?.restart === true ? 'applies on restart' : ''
@@ -119,63 +96,54 @@ export const SettingsFooter = memo(function SettingsFooter({
   const { fromConfigFile, touched } = row ? rowMarks(row, storeMarks) : storeMarks
   const defaultValue = useSettingsStore((s) => (row ? s.defaults[row.id] : undefined))
 
-  const handleClose = useCallback(() => dispatchGlobal({ type: 'exit-settings' }), [])
-
-  const notes = row ? notesFor(row, fromConfigFile) : ''
   // Only once the row has been changed — `r` is otherwise a key you press to
   // find out what it does.
   const resetHint =
     row && touched && defaultValue !== undefined
       ? `default: ${describeValue(row, defaultValue)}`
       : null
+  // The surface's own padding either side.
+  const inner = Math.max(1, width - 4)
+  const aside = [row ? notesFor(row, fromConfigFile) : '', resetHint ?? '']
+    .filter((part) => part !== '')
+    .join(' · ')
 
   return (
     <box flexDirection="column" flexShrink={0} paddingLeft={pad} paddingRight={pad}>
-      {/* A blank row, not a rule: the footer is set off from the list by the gap,
-          the same way the sidebar's is. */}
-      <box height={1} flexShrink={0} />
-      <box width={width} flexDirection="row" flexShrink={0}>
-        <box flexGrow={1} flexShrink={1}>
-          <text fg={t.textMuted} selectable={false} wrapMode="none">
-            {truncate(notes, Math.max(0, width - (resetHint?.length ?? 0) - 2))}
+      {/* Its own surface, painted once: on the page it was one more paragraph
+          under the list and the eye went past it. */}
+      <box
+        flexDirection="column"
+        flexShrink={0}
+        width={width}
+        padding={1}
+        paddingLeft={2}
+        paddingRight={2}
+        backgroundColor={t.backgroundPanel}
+      >
+        <box width={inner} height={DESCRIPTION_ROWS} flexShrink={0} overflow="hidden">
+          <text fg={t.text} selectable={false}>
+            {row?.description ?? ''}
           </text>
         </box>
-        {resetHint != null ? (
-          <text fg={t.textMuted} selectable={false} wrapMode="none">
-            {resetHint}
-          </text>
-        ) : null}
-      </box>
-      <box height={1} flexShrink={0} overflow="hidden">
-        {row?.kind === 'select' ? <OptionStrip row={row} /> : null}
-        {row?.kind === 'text' || row?.kind === 'action' || row?.kind === 'info' ? (
-          <FullValue row={row} />
-        ) : null}
-        {row?.kind === 'number' || row?.kind === 'toggle' ? (
-          <text fg={t.textMuted} selectable={false} wrapMode="none">
-            {rangeOf(row)}
-          </text>
-        ) : null}
-      </box>
-      {/* Clipped rather than squeezed: a row of hints allowed to shrink loses
-          the spaces *inside* the words first, and `↵change  -/+step` is worse
-          than the same line with its tail cut off on a narrow terminal. */}
-      <box width={width} flexDirection="row" flexShrink={0} gap={2} overflow="hidden">
-        {hintsFor(row).map(([key, what]) => (
-          <box key={key} flexDirection="row" flexShrink={0}>
-            <text
-              fg={t.primary}
-              selectable={false}
-              wrapMode="none"
-              onMouseDown={key === 'esc' ? handleClose : undefined}
-            >
-              {key}
-            </text>
-            <text fg={t.textMuted} selectable={false} wrapMode="none">
-              {` ${what}`}
-            </text>
+        <box width={inner} height={1} flexDirection="row" flexShrink={0} overflow="hidden">
+          <box flexGrow={1} flexShrink={1} overflow="hidden">
+            {row?.kind === 'select' ? <OptionStrip row={row} /> : null}
+            {row?.kind === 'text' || row?.kind === 'action' || row?.kind === 'info' ? (
+              <FullValue row={row} />
+            ) : null}
+            {row?.kind === 'number' || row?.kind === 'toggle' ? (
+              <text fg={t.textMuted} selectable={false} wrapMode="none">
+                {rangeOf(row)}
+              </text>
+            ) : null}
           </box>
-        ))}
+          {aside === '' ? null : (
+            <text fg={fromConfigFile ? t.warning : t.textMuted} selectable={false} wrapMode="none">
+              {`  ${truncate(aside, Math.max(0, inner - 12))}`}
+            </text>
+          )}
+        </box>
       </box>
     </box>
   )
