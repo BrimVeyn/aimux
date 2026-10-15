@@ -174,6 +174,18 @@ test('an assistant without a prompt argument still gets the prompt pasted', asyn
   expect(writes.every((entry) => entry.tabId === tab.id)).toBe(true)
 })
 
+test('Enter pressed again while the worktree is cut launches once', async () => {
+  const { ctx, started } = harness(seed())
+  // The first pick turns the picker into a progress view; a second one reaching
+  // the side effect before the worktree lands must not race it.
+  executeSideEffect({ type: 'launch-selected-assistant' }, ctx)
+  expect(ctx.getState().modal).toMatchObject({ launching: true, type: 'new-tab' })
+  executeSideEffect({ type: 'launch-selected-assistant' }, ctx)
+  await Bun.sleep(0)
+  expect(ctx.getState().tabs).toHaveLength(1)
+  expect(started).toHaveLength(1)
+})
+
 test('a plain new tab sends nothing', async () => {
   const base = createInitialState(AVAILABLE_COMMANDS, [])
   const { ctx, writes } = harness(appReducer(base, { type: 'open-new-tab-modal' }))

@@ -523,6 +523,12 @@ export interface ModalNewTab extends ModalBase {
    */
   pendingWorkspace?: PendingWorkspaceLaunch
   /**
+   * An assistant was picked and waits for `pendingWorkspace`'s worktree. The
+   * picker gives way to a progress view that takes no input but Esc, so the
+   * pick cannot be made twice.
+   */
+  launching?: boolean
+  /**
    * A prompt to hand the picked assistant, with none of `pendingWorkspace`'s
    * other behaviour: no workspace pinning, no rename. Used by "Ask an agent" in
    * the setup widget.
@@ -990,6 +996,7 @@ export type BuiltinModeId =
   | 'git-mode'
   | 'modal.new-tab.command-edit'
   | 'modal.new-tab.editing-command'
+  | 'modal.new-tab.launching'
   | 'modal.workspace-delete-confirm'
   | 'modal.project-picker.filtering'
   | 'modal.project-name'
@@ -1185,6 +1192,7 @@ export type ModalAction =
   | { type: 'move-modal-selection'; delta: number }
   | { type: 'update-command-edit'; char: string }
   | { type: 'cancel-command-edit' }
+  | { type: 'start-new-tab-launch' }
   | { type: 'open-create-project-modal'; returnToProjectPicker: boolean }
   | { type: 'open-create-workspace-modal' }
   | { type: 'set-create-workspace-base-branches'; branches: string[]; defaultBranch?: string }

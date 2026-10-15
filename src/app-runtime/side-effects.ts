@@ -250,6 +250,10 @@ export function executeSideEffect(effect: SideEffect, ctx: SideEffectContext): v
       // waits for it. Otherwise it lands in the project's active workspace,
       // which launchAssistant resolves itself.
       if (newTab?.pendingWorkspace) {
+        // The picker turns into a progress view until the worktree lands; a
+        // second pick in the meantime would race the first for the same tab.
+        if (newTab.launching === true) return
+        dispatch({ type: 'start-new-tab-launch' })
         launchPendingWorkspace(ctx, assistant, newTab.pendingWorkspace)
         return
       }

@@ -122,6 +122,7 @@ function modalInputModeId(state: AppState): ModeId | null {
     if (modal.stage === 'generating') return 'modal.git-commit.generating'
     if (modal.stage === 'confirm') return 'modal.git-commit.confirm'
   }
+  if (modal.type === 'new-tab' && modal.launching === true) return 'modal.new-tab.launching'
   if (modal.type === 'new-tab' && modal.editingCommand !== null) {
     return 'modal.new-tab.editing-command'
   }

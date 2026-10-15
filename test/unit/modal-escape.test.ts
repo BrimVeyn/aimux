@@ -36,6 +36,16 @@ function pressEscape(open: AppAction[]): AppState {
 /** Modals Esc dismisses outright. */
 const CLOSES: [string, AppAction[]][] = [
   ['new-tab', [{ type: 'open-new-tab-modal' }]],
+  [
+    'new-tab launching',
+    [
+      {
+        pendingWorkspace: { projectId: 'sess-1', prompt: '', workspaceId: 'ws-1' },
+        type: 'open-new-tab-modal',
+      },
+      { type: 'start-new-tab-launch' },
+    ],
+  ],
   ['help', [{ type: 'open-help-modal' }]],
   ['split-picker', [{ direction: 'horizontal', type: 'open-split-picker' }]],
   ['project-picker', [{ type: 'open-project-picker' }]],

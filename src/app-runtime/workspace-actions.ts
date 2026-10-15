@@ -16,6 +16,7 @@ import {
   listLocalBranches,
   pruneGitWorktrees,
   removeGitWorktree,
+  resolveWorktreeBaseRef,
 } from '../git/worktree'
 import { copyWorktreeFiles } from '../git/worktree-files'
 import { createPrefixedId } from '../platform/id'
@@ -30,6 +31,7 @@ import { saveProjectCatalog } from '../state/project-catalog'
 import { pruneSnapshotOfWorkspace } from '../state/project-persistence'
 import { getActiveWorkspace, getActiveWorkspacePath } from '../state/project-workspaces'
 import { toast } from '../state/toast-store'
+import { completeWorkspaceCreateStep, planWorkspaceCreate } from '../state/workspace-create-store'
 
 /** Namespace for the throwaway branch a temp workspace starts life on. */
 const AIMUX_BRANCH_PREFIX = 'aimux/'
@@ -179,16 +181,30 @@ export async function createAimuxTempWorkspace(
 
   await mkdir(dirname(targetPath), { recursive: true })
   await assertSafeAimuxWorktreePath(targetPath)
+  // The slow part, one step at a time, so the picker's progress view can say
+  // which one it is waiting on. The fetch is resolved here rather than inside
+  // `createGitWorktree` for exactly that reason.
+  const refreshBase = shouldRefreshBase()
+  const copyPatterns = worktreeCopyPatterns()
+  planWorkspaceCreate([
+    ...(refreshBase ? [`Fetching latest ${baseRef}`] : []),
+    'Creating worktree',
+    ...(copyPatterns.length > 0 ? [`Copying ${copyPatterns.join(', ')}`] : []),
+  ])
   // What it forked from, not what was asked for: the two differ whenever the
   // base was refreshed from origin, and the record is what "based on" reads.
-  const forkRef = await createGitWorktree({
-    baseRef,
+  const forkRef = refreshBase ? await resolveWorktreeBaseRef(repoRoot, baseRef) : baseRef
+  if (refreshBase) completeWorkspaceCreateStep()
+  await createGitWorktree({
+    baseRef: forkRef,
     branchName,
-    refreshBase: shouldRefreshBase(),
+    refreshBase: false,
     repoPath: repoRoot,
     targetPath,
   })
-  await copyWorktreeFiles(repoRoot, targetPath, worktreeCopyPatterns())
+  completeWorkspaceCreateStep()
+  await copyWorktreeFiles(repoRoot, targetPath, copyPatterns)
+  if (copyPatterns.length > 0) completeWorkspaceCreateStep()
   const now = new Date().toISOString()
 
   const workspace: WorkspaceRecord = {

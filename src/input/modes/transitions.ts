@@ -17,8 +17,13 @@ const TRANSITIONS: Record<BuiltinModeId, readonly ModeId[]> = {
   'modal.git-commit.generating': ['modal.git-commit', 'modal.git-commit.confirm', 'git-mode'],
   'modal.git-file-filter': ['git-mode'],
   'modal.help.filtering': ['navigation'],
-  'modal.new-tab.command-edit': ['navigation', 'modal.new-tab.editing-command'],
+  'modal.new-tab.command-edit': [
+    'navigation',
+    'modal.new-tab.editing-command',
+    'modal.new-tab.launching',
+  ],
   'modal.new-tab.editing-command': ['navigation', 'modal.new-tab.command-edit'],
+  'modal.new-tab.launching': ['navigation'],
   // Opened over a plugin's own screen and closed back onto it: the mode follows
   // the modal, so no transition is ever asked for.
   'modal.plugin-input': [],

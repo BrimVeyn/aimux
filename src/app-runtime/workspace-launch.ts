@@ -7,6 +7,7 @@ import { branchNamingInstructions } from '../settings/live'
 import { hasSetupScript } from '../state/project-data'
 import { findWorkspace } from '../state/project-workspaces'
 import { toast } from '../state/toast-store'
+import { planWorkspaceCreate } from '../state/workspace-create-store'
 import { findSetupTab } from './setup-actions'
 import { launchWithPrompt } from './tab-actions'
 import { createAimuxTempWorkspace } from './workspace-actions'
@@ -41,6 +42,9 @@ export function startWorkspaceCreation(
   // Allocated here rather than by the create: the picker below pins its tab to
   // this workspace before git has produced anything to pin to.
   const workspaceId = createPrefixedId('workspace')
+  // Cleared now: the previous create's steps would otherwise show, all ticked,
+  // until the git queue lets this one plan its own.
+  planWorkspaceCreate([])
   pendingWorkspaceCreate = (async () => {
     try {
       await enqueueGitOp(async () =>
@@ -133,6 +137,10 @@ export function launchPendingWorkspace(
     const fresh = { ...ctx, state: ctx.getState() }
     const found = findWorkspace(fresh.state.projects, pending.workspaceId)
     if (!found) {
+      // The progress view has nothing left to wait for.
+      const { modal } = fresh.state
+      if (modal.type === 'new-tab' && modal.launching === true)
+        ctx.dispatch({ type: 'close-modal' })
       toast.error('Workspace creation failed — no tab was opened')
       return
     }
