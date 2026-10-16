@@ -12,6 +12,7 @@ import { IDLE_WORKSPACE_ACTIVITY } from '../../../../state/types'
 import { useWorkspaceDeleteStore } from '../../../../state/workspace-delete-store'
 import { useActivitySprite } from '../../../hooks/use-activity-sprite'
 import { useBusySpinner } from '../../../hooks/use-busy-spinner'
+import { useStatusPulse } from '../../../hooks/use-status-pulse'
 // eslint-disable-next-line no-duplicate-imports
 import { SPRITE_COLS } from '../../../terminal-graphics/sprites'
 import { useBaseTheme, useTheme } from '../../../theme'
@@ -147,6 +148,16 @@ export const WorkspaceRow = memo(function WorkspaceRow({
   // without reading anything.
   const cursorGlyph = isActiveItem ? '▌' : ' '
 
+  // A row whose agent needs you — a question, or finished work — flashes once in
+  // that state's colour, the sidebar's notification, then keeps a faint tint of
+  // it while the state lasts. Working is not news: the spinner already says it.
+  const pulseState = spriteStateFor(activity)
+  const paintPulse = useStatusPulse(
+    pulseState === 'waiting' || pulseState === 'done' ? pulseState : null,
+    pulseState === 'waiting' ? t.warning : t.success,
+    bgColor ?? base.backgroundPanel
+  )
+
   // The marker slot: two cells of text, or the wider box a sprite needs. The
   // bundled set covers every state, so with sprites on, every two-line row uses
   // the same width whatever its state — only a branchless row keeps the narrow
@@ -208,6 +219,7 @@ export const WorkspaceRow = memo(function WorkspaceRow({
       flexShrink={0}
       paddingRight={1}
       backgroundColor={bgColor}
+      renderAfter={paintPulse}
       rightClickMenu={rightClickMenu}
       onMouseDown={handleMouseDown}
     >
