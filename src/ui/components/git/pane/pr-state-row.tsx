@@ -59,11 +59,11 @@ export const PrStateRow = memo(function PrStateRow({ projectPath }: { projectPat
     setConfirming(false)
     if (cleanupKind === 'worktree') {
       if (projectId === null || removableWorkspaceId === null) return
-      // closeTabs (not force) mirrors the sidebar's "Remove workspace": the
-      // workspace's tabs are disposed, but a dirty worktree still re-prompts for
-      // an explicit force-delete instead of silently discarding work.
+      // Mirrors the sidebar's "Remove workspace": the confirmation above is the
+      // only prompt, so this force-deletes even a dirty worktree.
       runSideEffectGlobal({
         closeTabs: true,
+        force: true,
         projectId,
         type: 'delete-workspace',
         workspaceId: removableWorkspaceId,
