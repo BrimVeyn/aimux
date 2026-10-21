@@ -117,15 +117,12 @@ export const WorkspaceRow = memo(function WorkspaceRow({
       entries.push([
         'Remove workspace',
         () =>
-          // Always confirm first. Confirming routes through the full delete side
-          // effect (closes the workspace's tabs, disposes their PTYs, prunes the
-          // snapshot, removes the git worktree). closeTabs (not force) cleans up
-          // the tabs while keeping the non-force `git worktree remove`, so
-          // uncommitted work in a temp workspace is still protected — a dirty
-          // workspace re-prompts for an explicit force-delete.
+          // One confirmation, then a force-delete: closes the workspace's tabs,
+          // disposes their PTYs, prunes the snapshot and removes the git worktree
+          // even when dirty. This prompt is the only guard on uncommitted work.
           dispatchGlobal({
             closeTabs: true,
-            force: false,
+            force: true,
             projectId: project.id,
             type: 'open-workspace-delete-confirm',
             workspaceId: workspace.id,
