@@ -1,5 +1,6 @@
-import type { BoxRenderable, MouseEvent as OtuiMouseEvent } from '@opentui/core'
+import type { BoxRenderable, CliRenderer, MouseEvent as OtuiMouseEvent } from '@opentui/core'
 
+import { useRenderer } from '@opentui/react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 
 import type { BarSide } from '../../../state/types'
@@ -28,6 +29,21 @@ export interface BarBoundaryResizeInfo {
  * the content is not flush against the edge. Both grab.
  */
 const GUTTER = 2
+
+/**
+ * Set the terminal's mouse pointer by CSS name (OSC 22). opentui's own
+ * `setMousePointer` knows six shapes and no resize arrows, so the sequence goes
+ * out raw — through the renderer's writer, which orders it with the frames
+ * instead of racing them on stdout. Terminals without OSC 22 ignore it.
+ *
+ * ponytail: `writeOut` is private in opentui's typings. Switch to
+ * `setMousePointer` if it ever gains `ew-resize`.
+ */
+function setPointerShape(renderer: CliRenderer, shape: 'default' | 'ew-resize'): void {
+  ;(renderer as unknown as { writeOut: (chunk: string) => boolean }).writeOut(
+    `\u001B]22;${shape}\u001B\\`
+  )
+}
 
 /** The rule drawn on the rows that separate the bar's regions. */
 const BOUNDARY_RULE = '─'
@@ -77,6 +93,10 @@ export function Bar({
   const bars = useAppStore((s) => s.bars)
   const focusMode = useAppStore((s) => s.focusMode)
   const bodyRef = useRef<BoxRenderable | null>(null)
+  const renderer = useRenderer()
+  // The arrows show while the edge is under the pointer or being dragged; a drag
+  // outruns the two-column edge, so leaving it mid-drag must not drop them.
+  const edgeRef = useRef({ dragging: false, hovered: false })
 
   const bar = bars[side]
   const width = getBarWidth(bar)
@@ -97,15 +117,27 @@ export function Bar({
   )
   const handleMouseUp = useCallback(() => {
     onResizeDragEnd?.()
-  }, [onResizeDragEnd])
+    if (!edgeRef.current.dragging) return
+    edgeRef.current.dragging = false
+    if (!edgeRef.current.hovered) setPointerShape(renderer, 'default')
+  }, [onResizeDragEnd, renderer])
   const handleEdgeMouseDown = useCallback(
     (event: OtuiMouseEvent) => {
       event.preventDefault()
       event.stopPropagation()
+      edgeRef.current.dragging = true
       onEdgeResizeStart?.({ initialWidth: width, screenStart: event.x, side })
     },
     [onEdgeResizeStart, side, width]
   )
+  const handleEdgeMouseOver = useCallback(() => {
+    edgeRef.current.hovered = true
+    setPointerShape(renderer, 'ew-resize')
+  }, [renderer])
+  const handleEdgeMouseOut = useCallback(() => {
+    edgeRef.current.hovered = false
+    if (!edgeRef.current.dragging) setPointerShape(renderer, 'default')
+  }, [renderer])
 
   if (width === 0) return null
 
@@ -125,6 +157,8 @@ export function Bar({
       width={GUTTER}
       height="100%"
       onMouseDown={handleEdgeMouseDown}
+      onMouseOver={handleEdgeMouseOver}
+      onMouseOut={handleEdgeMouseOut}
     />
   )
 
