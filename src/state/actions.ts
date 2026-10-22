@@ -7,18 +7,4 @@
 // read by the whole app, this union only by the reducer and what dispatches
 // into it.
 
-export type {
-  AppAction,
-  AutoCommitAction,
-  DataAction,
-  GitModeAction,
-  GitPanelAction,
-  LayoutAction,
-  ModalAction,
-  MultiRepoAction,
-  ProjectAction,
-  SettingsAction,
-  StatsAction,
-  TabAction,
-  UIAction,
-} from '@brimveyn/aimux-config'
+export type { AppAction } from '@brimveyn/aimux-config'

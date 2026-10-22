@@ -70,23 +70,23 @@
     "@opentui/react": "^0.6.6",
     "@resvg/resvg-wasm": "^2.6.2",
     "@xterm/headless": "^6.0.0",
-    "bun-pty": "^0.4.8",
+    "bun-pty": "^0.4.11",
     "marked": "17.0.1",
-    "react": "^19.2.4",
-    "shiki": "^4.0.2",
-    "zustand": "^5.0.12"
+    "react": "^19.3.1",
+    "shiki": "^4.5.0",
+    "zustand": "^5.0.16"
   },
   "devDependencies": {
     "@types/bun": "latest",
-    "@types/node": "^25.5.0",
-    "@types/react": "^19.2.14",
-    "eslint-plugin-perfectionist": "^5.8.0",
-    "knip": "^6.4.1",
-    "lefthook": "^2.1.4",
+    "@types/node": "^25.9.9",
+    "@types/react": "^19.3.0",
+    "eslint-plugin-perfectionist": "^5.13.0",
+    "knip": "^6.42.1",
+    "lefthook": "^2.2.2",
     "oxfmt": "^0.42.0",
-    "oxlint": "^1.57.0",
+    "oxlint": "^1.89.0",
     "oxlint-tsgolint": "^0.23.0",
-    "typescript": "^6.0.2"
+    "typescript": "^6.0.3"
   },
   "engines": {
     "bun": ">=1.3.14"

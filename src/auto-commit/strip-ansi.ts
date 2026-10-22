@@ -9,5 +9,5 @@ const ANSI_RE =
   /\x1B(?:\]([\s\S]*?)(?:\x07|\x1B\\)|\[[0-?]*[ -/]*[@-~]|[@-_])|[\x00-\x08\x0B-\x1F\x7F]/g
 
 export function stripAnsi(input: string): string {
-  return input.replace(ANSI_RE, '')
+  return input.replaceAll(ANSI_RE, '')
 }

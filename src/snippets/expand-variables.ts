@@ -84,7 +84,7 @@ export function requiresAsyncExpansion(snippet: SnippetRecord): boolean {
 }
 
 export function expandSnippetSync(content: string, ctx: SyncExpansionContext): ExpansionResult {
-  const replaced = content.replace(VAR_RE, (match, rawName: string) => {
+  const replaced = content.replaceAll(VAR_RE, (match, rawName: string) => {
     const name = rawName.trim()
     if (name === 'clipboard') return match
     const resolved = resolveSyncVariable(name, ctx)
@@ -102,7 +102,7 @@ export async function expandSnippet(
   if (needsClipboard) {
     clipboardValue = await ctx.clipboard()
   }
-  const replaced = content.replace(VAR_RE, (match, rawName: string) => {
+  const replaced = content.replaceAll(VAR_RE, (match, rawName: string) => {
     const name = rawName.trim()
     if (name === 'clipboard' && clipboardValue !== null) return clipboardValue
     const resolved = resolveSyncVariable(name, ctx)

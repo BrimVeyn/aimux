@@ -3,13 +3,7 @@
 // used to be declared here as well, "kept structurally identical" by hand —
 // a promise no compiler was checking. Re-exporting keeps the import sites
 // unchanged while making drift impossible.
-export type {
-  LayoutLeaf,
-  LayoutLeafKind,
-  LayoutNode,
-  LayoutSplit,
-  SplitDirection,
-} from '@brimveyn/aimux-config'
+export type { LayoutLeaf, LayoutNode, SplitDirection } from '@brimveyn/aimux-config'
 
 import type { LayoutLeaf, LayoutNode, SplitDirection } from '@brimveyn/aimux-config'
 

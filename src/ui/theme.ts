@@ -2,7 +2,7 @@
 // components use `useTheme` for the resolved TUI token map; non-React callers
 // use `getCurrentTheme()`.
 
-export type { ResolvedTuiTheme, TuiColorToken } from './themes'
+export type { ResolvedTuiTheme } from './themes'
 export {
   applyTheme,
   getBaseTheme,
@@ -12,7 +12,6 @@ export {
   getTransparent,
   setMode,
   setTransparent,
-  subscribeThemeChanges,
   useBaseTheme,
   useMode,
   useTheme,
