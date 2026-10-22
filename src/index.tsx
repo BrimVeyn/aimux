@@ -101,7 +101,7 @@ const { createCliRenderer } = await import('@opentui/core')
 
 const [
   { createRoot },
-  { App },
+  { App, applyStartupTheme },
   { loadUserConfig },
   { BreakingUpdateScreen },
   { setHostPalette, setHostSpecialColors },
@@ -188,6 +188,8 @@ logDebug('index.userConfigLoaded', {
 if (resolvedConfig.theme?.beta?.experimentalSyntaxHighlight === true) {
   process.env.CLAUDE_CODE_SYNTAX_HIGHLIGHT = 'false'
 }
+
+applyStartupTheme(resolvedConfig)
 
 const backend = await createSessionBackend({
   autoRenameConfig: resolvedConfig.autoRename,
