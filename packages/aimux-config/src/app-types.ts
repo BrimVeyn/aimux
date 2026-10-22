@@ -129,6 +129,8 @@ export interface TerminalSpan {
   italic?: boolean
   underline?: boolean
   cursor?: boolean
+  /** OSC 8 hyperlink target. Its text is often a label (`google.com`), not the URL. */
+  link?: string
 }
 
 export interface TerminalLine {
@@ -287,6 +289,15 @@ export interface TabSession {
    * disconnected anyway, and Ctrl+r resumes them just the same.
    */
   hibernated?: boolean
+  /**
+   * The restore/close prompt drawn over a dead pane, holding the option it has
+   * selected; absent when there is no prompt. Set only once the backend has
+   * confirmed the death — a cold start restores every tab as `disconnected`
+   * until the attach says otherwise, and a prompt there would flash on every
+   * launch and could restart a live session. Ephemeral — never persisted, never
+   * on the wire; a restart clears it.
+   */
+  restartPrompt?: 'restore' | 'close'
   errorMessage?: string
   exitCode?: number
   workspaceId?: string
@@ -1024,6 +1035,7 @@ export type BuiltinModeId =
   | 'modal.quotas'
   | 'settings'
   | 'stats'
+  | 'restart-prompt'
 
 /**
  * A mode a plugin owns. Namespaced by plugin id — `plugin.acme.thing.review` —
@@ -1295,6 +1307,7 @@ export type TabAction =
   | { type: 'reorder-tabs'; orderedTabIds: string[] }
   | { type: 'reset-tab-project'; tabId: string }
   | { type: 'hibernate-tab'; tabId: string }
+  | { type: 'select-restart-option'; tabId: string; option: 'restore' | 'close' }
   | {
       type: 'rename-tab'
       tabId: string

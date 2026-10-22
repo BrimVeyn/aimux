@@ -129,6 +129,19 @@ export const restartTab: ActionFn = (ctx: ModeContext) => {
   return r([], [{ tab, type: 'restart-tab' }])
 }
 
+export function selectRestartOption(option: 'restore' | 'close'): ActionFn {
+  return (ctx: ModeContext) => {
+    const tabId = ctx.state.activeTabId
+    if (!(tabId != null && tabId !== '')) return null
+    return r([{ option, tabId, type: 'select-restart-option' }])
+  }
+}
+
+export const confirmRestartOption: ActionFn = (ctx: ModeContext) => {
+  const tab = ctx.state.tabs.find((t) => t.id === ctx.state.activeTabId)
+  return tab?.restartPrompt === 'close' ? closeTab(ctx) : restartTab(ctx)
+}
+
 export const quit: ActionFn = (ctx: ModeContext) => {
   return r([], [{ state: ctx.state, type: 'quit' }])
 }

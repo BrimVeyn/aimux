@@ -9,9 +9,10 @@ import type { SplitDirection } from '../state/layout-tree'
 import type { AppState, BarSide, TabSession, TerminalLine } from '../state/types'
 
 import { logInputDebug } from '../debug/input-log'
-import { MultiClickDetector } from '../input/multi-click-detector'
-import { extractStreamText, getLineText } from '../input/terminal-text-extraction'
+import { MULTI_CLICK_TIMEOUT_MS, MultiClickDetector } from '../input/multi-click-detector'
+import { extractStreamText, getLineText, getLinkAtColumn } from '../input/terminal-text-extraction'
 import { copyToSystemClipboard } from '../platform/clipboard'
+import { openUrl } from '../platform/open-url'
 import { bump } from '../services/aimux-counters'
 import {
   type ClickSelectionResult,
@@ -164,6 +165,9 @@ export function useMouseHandlers({
   const separatorDragRef = useRef<ResizeDragState | null>(null)
   const multiClickRef = useRef(new MultiClickDetector())
   const multiClickDragRef = useRef<MultiClickDragState | null>(null)
+  // URL under a single-click mouse-down; opened on a release at the same cell.
+  const pendingLinkRef = useRef<{ url: string; x: number; y: number } | null>(null)
+  const linkTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   // State is captured by reference in the React closure; we need a ref so
   // drag/up handlers and the auto-scroll timer see the freshest tab viewport.
   const stateRef = useRef(state)
@@ -209,6 +213,7 @@ export function useMouseHandlers({
   // Unmount safety: never leave a setInterval running past the hook's life.
   useEffect(
     () => () => {
+      if (linkTimerRef.current) clearTimeout(linkTimerRef.current)
       const drag = multiClickDragRef.current
       if (drag) clearAutoScroll(drag)
       multiClickDragRef.current = null
@@ -273,6 +278,22 @@ export function useMouseHandlers({
     renderMultiClickSelection(renderer, drag, tab.viewport.viewportY, false)
   }, [state.tabs, renderer])
 
+  // Arms a URL open for a single left click; handleTerminalMouseUp fires it.
+  // A second click within the multi-click window cancels the pending open, so
+  // double-clicking a URL selects it instead.
+  const armLinkOpen = (event: OtuiMouseEvent, tab: TabSession | undefined, clickCount: number) => {
+    if (linkTimerRef.current) clearTimeout(linkTimerRef.current)
+    linkTimerRef.current = null
+    pendingLinkRef.current = null
+    if (clickCount !== 1) return
+
+    const anchor = getViewportAnchor(event)
+    const line = anchor ? tab?.viewport?.lines[anchor.row] : undefined
+    const url = anchor && line ? getLinkAtColumn(line, anchor.col) : null
+    logInputDebug('link.down', { col: anchor?.col, row: anchor?.row, url })
+    if (url != null) pendingLinkRef.current = { url, x: event.x, y: event.y }
+  }
+
   const handleTerminalMouseEvent = (event: OtuiMouseEvent, origin: TerminalContentOrigin) => {
     const targetTabId = getTargetTerminalTabId(
       state.focusMode,
@@ -281,6 +302,13 @@ export function useMouseHandlers({
     )
     if (!(targetTabId != null && targetTabId !== '')) {
       return
+    }
+
+    // Mouse-capturing apps (Claude Code) get the click too, but URLs in their
+    // output still open: the host terminal can't see them behind our capture.
+    if (event.type === 'down' && event.button === 0) {
+      const tab = state.tabs.find((t: TabSession) => t.id === targetTabId)
+      armLinkOpen(event, tab, multiClickRef.current.track(event.x, event.y))
     }
 
     const sequence = getForwardedMouseSequence(event, origin)
@@ -417,7 +445,9 @@ export function useMouseHandlers({
       return
     }
 
+    const tab = state.tabs.find((t: TabSession) => t.id === targetTabId)
     const clickCount = multiClickRef.current.track(event.x, event.y)
+    armLinkOpen(event, tab, clickCount)
     if (clickCount < MIN_MULTI_CLICK_SELECTION_COUNT) {
       // Single-click: clear any stale multi-click drag state so a fresh
       // char-level drag from opentui's default handler isn't extended by us.
@@ -427,7 +457,6 @@ export function useMouseHandlers({
       return
     }
 
-    const tab = state.tabs.find((t: TabSession) => t.id === targetTabId)
     const selection = resolveClickSelection(event, targetTabId, tab, clickCount)
     if (!selection || !tab?.viewport) {
       return
@@ -474,6 +503,7 @@ export function useMouseHandlers({
     _origin: TerminalContentOrigin,
     _tabId?: string
   ): boolean => {
+    pendingLinkRef.current = null
     const drag = multiClickDragRef.current
     if (!drag) return false
 
@@ -523,7 +553,17 @@ export function useMouseHandlers({
     return true
   }
 
-  const handleTerminalMouseUp = (_event: OtuiMouseEvent): boolean => {
+  const handleTerminalMouseUp = (event: OtuiMouseEvent): boolean => {
+    const link = pendingLinkRef.current
+    pendingLinkRef.current = null
+    if (link && event.x === link.x && event.y === link.y) {
+      linkTimerRef.current = setTimeout(() => {
+        linkTimerRef.current = null
+        logInputDebug('link.open', { url: link.url })
+        openUrl(link.url)
+      }, MULTI_CLICK_TIMEOUT_MS)
+    }
+
     const drag = multiClickDragRef.current
     if (!drag) return false
 

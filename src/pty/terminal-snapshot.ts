@@ -1,4 +1,4 @@
-import type { Terminal } from '@xterm/headless'
+import type { IBufferCell, Terminal } from '@xterm/headless'
 
 import type {
   TerminalCursorStyle,
@@ -48,13 +48,38 @@ function pushSpan(spans: TerminalSpan[], span: TerminalSpan): void {
     previous.bold === span.bold &&
     previous.italic === span.italic &&
     previous.underline === span.underline &&
-    previous.cursor === span.cursor
+    previous.cursor === span.cursor &&
+    previous.link === span.link
   ) {
     previous.text += span.text
     return
   }
 
   spans.push(span)
+}
+
+// xterm keeps OSC 8 targets (cell `extended.urlId` -> OscLinkService) but has
+// no public API for them, so this reads internals and degrades to no links.
+// The reused cell keeps a stale `extended` from earlier cells, hence the
+// `hasExtendedAttrs` gate.
+function getCellLink(terminal: Terminal, cell: IBufferCell): string | undefined {
+  const hasExtended: unknown = Reflect.get(cell, 'hasExtendedAttrs')
+  if (typeof hasExtended !== 'function' || hasExtended.call(cell) === 0) return undefined
+  const extended: unknown = Reflect.get(cell, 'extended')
+  const urlId: unknown = isObject(extended) ? Reflect.get(extended, 'urlId') : undefined
+  if (typeof urlId !== 'number' || urlId === 0) return undefined
+  const core: unknown = Reflect.get(terminal, '_core')
+  const service: unknown = isObject(core) ? Reflect.get(core, '_oscLinkService') : undefined
+  if (!isObject(service)) return undefined
+  const getLinkData: unknown = Reflect.get(service, 'getLinkData')
+  if (typeof getLinkData !== 'function') return undefined
+  const data: unknown = getLinkData.call(service, urlId)
+  const uri: unknown = isObject(data) ? Reflect.get(data, 'uri') : undefined
+  return typeof uri === 'string' ? uri : undefined
+}
+
+function isObject(value: unknown): value is object {
+  return typeof value === 'object' && value !== null
 }
 
 function buildLine(
@@ -112,6 +137,8 @@ function buildLine(
       text,
       underline: current.isUnderline() ? true : undefined,
     }
+    const link = getCellLink(terminal, current)
+    if (link !== undefined) span.link = link
     applySpanColor(span, fg, 'fg')
     applySpanColor(span, bg, 'bg')
     pushSpan(spans, span)
@@ -230,7 +257,8 @@ function areSpansEqual(left: TerminalSpan, right: TerminalSpan): boolean {
     left.bold === right.bold &&
     left.italic === right.italic &&
     left.underline === right.underline &&
-    left.cursor === right.cursor
+    left.cursor === right.cursor &&
+    left.link === right.link
   )
 }
 

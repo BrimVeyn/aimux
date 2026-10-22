@@ -593,7 +593,8 @@ function isTerminalSpan(value: unknown): boolean {
     (value.bold === undefined || typeof value.bold === 'boolean') &&
     (value.italic === undefined || typeof value.italic === 'boolean') &&
     (value.underline === undefined || typeof value.underline === 'boolean') &&
-    (value.cursor === undefined || typeof value.cursor === 'boolean')
+    (value.cursor === undefined || typeof value.cursor === 'boolean') &&
+    (value.link === undefined || isString(value.link))
   )
 }
 

@@ -1,6 +1,6 @@
 import { logInputDebug } from '../debug/input-log'
 
-const MULTI_CLICK_TIMEOUT_MS = 400
+export const MULTI_CLICK_TIMEOUT_MS = 400
 const MULTI_CLICK_MAX_DISTANCE = 1
 
 export class MultiClickDetector {

@@ -65,6 +65,9 @@ const TRANSITIONS: Record<BuiltinModeId, readonly ModeId[]> = {
     'settings',
     'stats',
   ],
+  // A layer over the panes' mode rather than a mode of its own: its keys run
+  // in the panes' name, so nothing ever transitions into or out of it.
+  'restart-prompt': [],
   // The help overlay opens over settings without a transition (it leaves
   // focusMode alone). The two pickers an action row hands over to are dispatched
   // directly rather than through a KeyResult, but they are listed because that is

@@ -110,7 +110,7 @@ describe('a running command pane', () => {
     withTabs([tab('tab-1'), tab('tab-2', { pluginPane: 'acme.git.lazygit', title: 'lazygit' })])
     expect(recordCommandPaneExit('tab-2', 1)).toBe(true)
     const after = appStore.getState().tabs.find((entry) => entry.id === 'tab-2')
-    expect(after?.errorMessage).toContain('lazygit exited with code 1')
+    expect(after?.errorMessage).toContain('Exited with code 1')
     // An ordinary tab is not this module's business.
     expect(recordCommandPaneExit('tab-1', 0)).toBe(false)
   })

@@ -193,7 +193,7 @@ export function recordCommandPaneExit(tabId: string, exitCode: number): boolean 
   const tab = appStore.getState().tabs.find((entry) => entry.id === tabId)
   if (tab?.pluginPane === undefined) return false
   dispatchGlobal({
-    message: `${tab.title} exited with code ${exitCode}. Press Ctrl+r to run it again.`,
+    message: `Exited with code ${exitCode}`,
     tabId,
     type: 'set-tab-error',
   })

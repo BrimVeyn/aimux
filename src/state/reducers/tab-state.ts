@@ -371,9 +371,16 @@ export function reduceTabState(state: AppState, action: AppAction): AppState | n
       // it — and drops the id the resume depends on. Both fields belong to the
       // client, so keep what it already holds for the tabs it knows.
       const ownedById = new Map(state.tabs.map((entry) => [entry.id, entry]))
+      // The attach is also what confirms a tab is dead rather than merely
+      // restored: only now does a `disconnected`/`error` tab get its restart
+      // prompt, and one already up keeps its selection.
       const hydratedTabs = action.tabs.map((entry) => {
         const owned = ownedById.get(entry.id)
-        return owned ? { ...entry, command: owned.command, sessionId: owned.sessionId } : entry
+        const dead = entry.status === 'disconnected' || entry.status === 'error'
+        const restartPrompt = dead ? (owned?.restartPrompt ?? 'restore') : undefined
+        return owned
+          ? { ...entry, command: owned.command, restartPrompt, sessionId: owned.sessionId }
+          : { ...entry, restartPrompt }
       })
       const visibleForWorkspace = filterTabsForActiveWorkspace(hydratedTabs, currentProject)
       const visibleIds = new Set(visibleForWorkspace.map((t) => t.id))
@@ -550,6 +557,7 @@ export function reduceTabState(state: AppState, action: AppAction): AppState | n
             errorMessage: undefined,
             exitCode: undefined,
             hibernated: undefined,
+            restartPrompt: undefined,
             status: 'starting',
             terminalModes: createDefaultTerminalModes(),
             viewport: undefined,
@@ -616,8 +624,16 @@ export function reduceTabState(state: AppState, action: AppAction): AppState | n
           activity: undefined,
           buffer: clampBuffer(`${tab.buffer}${action.message}\n`),
           errorMessage: action.message,
+          restartPrompt: 'restore',
           status: 'error',
         })),
+      }
+    case 'select-restart-option':
+      return {
+        ...state,
+        tabs: updateTab(state.tabs, action.tabId, (tab) =>
+          tab.restartPrompt === undefined ? tab : { ...tab, restartPrompt: action.option }
+        ),
       }
     case 'rename-tab':
       return {
