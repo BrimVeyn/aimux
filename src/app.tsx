@@ -33,7 +33,7 @@ import { enqueueGitOp } from './git/command-queue'
 import { pruneOrphanAimuxBranches } from './git/worktree'
 import { setKeymapHandlerWiring } from './input/keymap/handler-wiring'
 import { setActiveKeymap } from './input/keymap/keymap-ref'
-import { deriveModeId } from './input/modes/bridge'
+import { deriveModeId, restartPromptHasKeys } from './input/modes/bridge'
 import { registerAllModes } from './input/modes/handlers'
 import { getHandler, transitionTo } from './input/modes/registry'
 import { highlightSnapshot, warmClaudeSyntaxOverlay } from './integrations/claude-syntax-overlay'
@@ -571,7 +571,11 @@ export function App({
     if (!handler) return
 
     const ctx: ModeContext = { state: currentState }
-    const result = handler.handleKey(key, ctx)
+    // A dead active pane's prompt gets first look, then the key falls through.
+    const promptResult = restartPromptHasKeys(currentState)
+      ? (getHandler('restart-prompt')?.handleKey(key, ctx) ?? null)
+      : null
+    const result = promptResult ?? handler.handleKey(key, ctx)
     if (!result) return
 
     key.preventDefault()

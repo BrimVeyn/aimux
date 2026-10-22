@@ -185,7 +185,10 @@ export function useRendererBindings({
       getActiveTabId: () => activeTabIdRef.current,
       getBracketedPasteModeEnabled: () =>
         activeTabRef.current?.terminalModes.bracketedPasteMode ?? false,
-      getFocusMode: () => focusModeRef.current,
+      // The PTY behind a dead pane is gone: let opentui parse the keys instead,
+      // so the restart prompt and the terminal-input keymap still see them.
+      getFocusMode: () =>
+        activeTabRef.current?.restartPrompt === undefined ? focusModeRef.current : 'navigation',
       getIsAlternateBuffer: () => activeTabRef.current?.terminalModes.isAlternateBuffer ?? false,
       handleTerminalShortcut,
       resetTrigger: (tabId) => triggerDetectorsRef.current.get(tabId)?.reset(),

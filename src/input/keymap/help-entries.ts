@@ -38,6 +38,7 @@ const BUILTIN_MODE_LABELS: HelpModeLabel[] = [
   { label: 'Help', modeId: 'modal.help.filtering' },
   { label: 'Help — filter', modeId: 'modal.help.filtering' },
   { label: 'Update available', modeId: 'modal.update-available' },
+  { label: 'Restart prompt', modeId: 'restart-prompt' },
 ]
 
 const pluginModeLabels = new Map<string, string>()

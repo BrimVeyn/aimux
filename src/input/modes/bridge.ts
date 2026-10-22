@@ -129,3 +129,15 @@ function modalInputModeId(state: AppState): ModeId | null {
 
   return MODAL_MODE_IDS[modal.type]
 }
+
+/**
+ * Whether the restart prompt over a dead active pane gets first look at a key.
+ * It is a layer, not a mode: it claims only the keys it binds, and everything
+ * else still reaches the panes' own keymap — tab switching, leader chords.
+ */
+export function restartPromptHasKeys(state: AppState): boolean {
+  return (
+    (state.focusMode === 'navigation' || state.focusMode === 'terminal-input') &&
+    state.tabs.find((tab) => tab.id === state.activeTabId)?.restartPrompt !== undefined
+  )
+}
