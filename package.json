@@ -70,8 +70,8 @@
     "@opentui/react": "^0.6.6",
     "@resvg/resvg-wasm": "^2.6.2",
     "@xterm/headless": "^6.0.0",
-    "bun-pty": "^0.4.11",
-    "marked": "17.0.1",
+    "bun-pty": "^0.5.1",
+    "marked": "^18.1.1",
     "react": "^19.3.1",
     "shiki": "^4.5.0",
     "zustand": "^5.0.16"
