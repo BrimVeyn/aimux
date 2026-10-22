@@ -135,6 +135,8 @@ export interface TerminalSpan {
 
 export interface TerminalLine {
   spans: TerminalSpan[]
+  /** The terminal soft-wrapped the row above into this one: same logical line. */
+  wrapped?: true
 }
 
 /** DECSCUSR cursor shape; 'default' restores the host terminal's configured cursor. */

@@ -354,8 +354,7 @@ const RESIZE_BACKEND = {
 } as unknown as SessionBackend
 const RESIZE_RENDERER = {
   clearSelection() {},
-  startSelection() {},
-  updateSelection() {},
+  copyToClipboardOSC52: () => true,
 }
 
 function ResizeHarness({ bars }: { bars: BarsState }) {

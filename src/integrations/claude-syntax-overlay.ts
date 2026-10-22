@@ -271,7 +271,7 @@ function rebuildLine(
     out.push({ bg: stripBg, fg: fallbackFg, text: ' '.repeat(targetWidth - written) })
   }
 
-  return { spans: out }
+  return { ...line, spans: out }
 }
 
 // Return a shallow copy of the spans covering [start, start+count) chars,

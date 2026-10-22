@@ -21,8 +21,10 @@ import type {
   TerminalSpan,
 } from '../../../state/types'
 
+import { useTerminalSelection } from '../../../app-runtime/terminal-selection-store'
 import { type MeasuredPaneRect, usePaneSizeReport } from '../../../app-runtime/use-pane-size-report'
 import { logInputDebug } from '../../../debug/input-log'
+import { type CellRange, rowColumns, splitSpansAtColumns } from '../../../input/terminal-selection'
 import { useAppStore } from '../../../state/app-store'
 import { dispatchGlobal, runSideEffectGlobal } from '../../../state/dispatch-ref'
 import { type ContextMenuItem, openContextMenu } from '../../context-menu/controller'
@@ -100,6 +102,11 @@ export interface TerminalViewportProps {
   buffer: string
   softCursor: boolean
   textNodeRef?: RefObject<TextRenderable | null>
+  /**
+   * The pane's own selection, drawn here (use-mouse-handlers owns it). Leave it
+   * out and opentui selects the text natively instead, as in the setup widget.
+   */
+  selection?: CellRange | null
 }
 
 const OPENTUI_CURSOR_STYLES: Record<TerminalCursorStyle, CursorStyle> = {
@@ -191,10 +198,9 @@ const stopPropagation = (event: OtuiMouseEvent): void => event.stopPropagation()
 // TextBufferRenderable.onMouseEvent() unconditionally calls handleScroll() for a
 // scroll event. Overriding onMouseEvent (rather than only handleScroll) is a
 // single deterministic no-op standing between every wheel step and _scrollY, so
-// the drift can no longer slip in on a path the later reset misses. Selection is
-// unaffected: it is driven by the renderer (startSelection/updateSelection), not
-// by onMouseEvent, which exists only to scroll. Both are protected; reach them
-// via Reflect, mirroring the scrollY reset already used elsewhere in the pane.
+// the drift can no longer slip in on a path the later reset misses. onMouseEvent
+// exists only to scroll there. Both are protected; reach them via Reflect,
+// mirroring the scrollY reset already used elsewhere in the pane.
 const pinTerminalScroll = (node: TextRenderable | null): void => {
   if (!node) return
   Reflect.set(node, 'onMouseEvent', NOOP)
@@ -203,11 +209,13 @@ const pinTerminalScroll = (node: TextRenderable | null): void => {
 
 export const TerminalViewport = memo(function TerminalViewport({
   buffer,
+  selection,
   softCursor,
   textNodeRef,
   viewport,
 }: TerminalViewportProps) {
   const t = useTheme()
+  const ink = useSelectionInk()
   const mergedRef = useCallback(
     (node: TextRenderable | null): void => {
       pinTerminalScroll(node)
@@ -219,13 +227,24 @@ export const TerminalViewport = memo(function TerminalViewport({
   )
   if (viewport && viewport.lines.length > 0) {
     const lines = viewport.lines
+    const renderLine = (spans: TerminalSpan[], row: number): ReactNode => {
+      const cols = selection ? rowColumns(selection, row, Number.POSITIVE_INFINITY) : null
+      if (!cols) return spans.map((span, i) => renderSpan(span, `s-${i}`, softCursor))
+      return splitSpansAtColumns(spans, cols[0], cols[1]).map(({ selected, span }, i) =>
+        renderSpan(
+          selected ? { bg: t.primary, fg: ink, text: span.text } : span,
+          `s-${i}`,
+          softCursor
+        )
+      )
+    }
     return (
-      <text ref={mergedRef} fg={t.text} wrapMode="none">
+      <text ref={mergedRef} fg={t.text} wrapMode="none" selectable={selection === undefined}>
         {lines.map((line, lineIndex) => (
           // Terminal rows are a fixed positional grid; the row index is the identity.
           // eslint-disable-next-line react/no-array-index-key
           <span key={`line-${lineIndex}`}>
-            {line.spans.map((span, spanIndex) => renderSpan(span, `s-${spanIndex}`, softCursor))}
+            {renderLine(line.spans, viewport.viewportY + lineIndex)}
             {lineIndex < lines.length - 1 ? '\n' : ''}
           </span>
         ))}
@@ -263,6 +282,7 @@ export function TerminalPane({
 }: TerminalPaneProps) {
   const t = useTheme()
   const ink = useSelectionInk()
+  const selection = useTerminalSelection(tabId)
   const setContentBox = usePaneSizeReport(tabId, !!tab, onMeasure)
   const editorBg = t.background
   const paneIsActive = isActive ?? true
@@ -590,6 +610,7 @@ export function TerminalPane({
             <TerminalViewport
               viewport={tab.viewport}
               buffer={tab.buffer}
+              selection={selection}
               softCursor={!showHardwareCursor}
               textNodeRef={textNodeRef}
             />

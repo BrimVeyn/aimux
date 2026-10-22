@@ -10,21 +10,19 @@ import type { AppState, BarSide, TabSession, TerminalLine } from '../state/types
 
 import { logInputDebug } from '../debug/input-log'
 import { MULTI_CLICK_TIMEOUT_MS, MultiClickDetector } from '../input/multi-click-detector'
-import { extractStreamText, getLineText, getLinkAtColumn } from '../input/terminal-text-extraction'
+import {
+  type CellPos,
+  type CellRange,
+  expandAt,
+  isSameRange,
+  type SelectionMode,
+  selectionText,
+  unionRange,
+} from '../input/terminal-selection'
+import { getLinkAtColumn } from '../input/terminal-text-extraction'
 import { copyToSystemClipboard } from '../platform/clipboard'
 import { openUrl } from '../platform/open-url'
 import { bump } from '../services/aimux-counters'
-import {
-  type ClickSelectionResult,
-  computeRangeFromLineText,
-  getViewportAnchor,
-  isPositionedNode,
-  type MultiClickMode,
-  resolveClickSelection,
-} from './click-selection-resolver'
-import { recordMultiClickClipboardWrite } from './multi-click-clipboard-guard'
-import { requestRenderUpTree } from './render-invalidation'
-import { shouldWriteSelectionToClipboard } from './selection-clipboard-dedup'
 import {
   type AxisDragState,
   getAxisDeltaFromDrag,
@@ -34,33 +32,27 @@ import {
   type SplitDragState,
 } from './split-drag-controller'
 import { getForwardedMouseSequence, getScrollViewportDelta } from './terminal-mouse-adapter'
+import { setTerminalSelection } from './terminal-selection-store'
 
 type ResizeDragState =
   | ({ kind: 'split' } & SplitDragState)
   | ({ initialWidth: number; kind: 'bar'; side: BarSide } & AxisDragState)
   | ({ index: number; kind: 'bar-boundary'; side: BarSide } & RatioDragState)
 
-interface MultiClickDragState {
-  mode: MultiClickMode
+interface SelectionDragState {
   tabId: string
-  target: unknown
-  baseX: number
-  baseY: number
-  // Absolute buffer rows (viewportY + viewportRow). Stable across scroll so
-  // auto-scroll can move the viewport without losing the anchor.
-  anchorAbsRow: number
-  anchorStartCol: number
-  anchorEndCol: number
-  focusAbsRow: number
-  focusCol: number
-  // Last raw screen position so the viewport-change effect can re-extend the
-  // selection even when no drag event has fired (mouse held still at the edge).
-  lastEventScreenY: number
-  lastEventScreenX: number
-  // Cache of every viewport row seen during the drag, indexed by absolute row.
-  // Source of truth for clipboard text when the selection spans rows that have
-  // scrolled out of view.
-  capturedLines: Map<number, TerminalLine>
+  mode: SelectionMode
+  origin: TerminalContentOrigin
+  // What the press itself selected. Each drag step selects it plus the focus.
+  anchor: CellRange
+  range: CellRange | null
+  // Last pointer position, so a snapshot can re-extend the selection while the
+  // mouse is held still at an edge and auto-scroll moves the text under it.
+  pointerX: number
+  pointerY: number
+  // Every row seen during the drag, by absolute row. The copy reads these, so a
+  // selection taller than the viewport still copies whole.
+  rows: Map<number, TerminalLine>
   autoScrollTimer: ReturnType<typeof setInterval> | null
   autoScrollDir: -1 | 0 | 1
   // A scroll command was sent to the backend and we are still waiting for the
@@ -81,16 +73,14 @@ interface UseMouseHandlersOptions {
   backend: SessionBackend
   renderer: {
     clearSelection(): void
-    hasSelection?: boolean
-    startSelection(target: unknown, x: number, y: number): void
-    updateSelection(target: unknown, x: number, y: number, opts: { finishDragging: boolean }): void
+    copyToClipboardOSC52(text: string): boolean
   }
   activeMouseForwardingEnabled: boolean
   activeLocalScrollbackEnabled: boolean
 }
 
-const MIN_MULTI_CLICK_SELECTION_COUNT = 2
 const AUTO_SCROLL_INTERVAL_MS = 40
+const SELECTION_MODES: readonly SelectionMode[] = ['char', 'word', 'line']
 
 function getTargetTerminalTabId(
   focusMode: AppState['focusMode'],
@@ -104,54 +94,32 @@ function getTargetTerminalTabId(
   return activeTabId
 }
 
-function captureViewportLines(drag: MultiClickDragState, tab: TabSession): void {
+function captureRows(drag: SelectionDragState, tab: TabSession): void {
   if (!tab.viewport) return
   const startAbs = tab.viewport.viewportY
   for (let i = 0; i < tab.viewport.lines.length; i++) {
     const line = tab.viewport.lines[i]
-    if (line) drag.capturedLines.set(startAbs + i, line)
+    if (line) drag.rows.set(startAbs + i, line)
   }
 }
 
-function isForwardSelection(drag: MultiClickDragState): boolean {
-  return (
-    drag.focusAbsRow > drag.anchorAbsRow ||
-    (drag.focusAbsRow === drag.anchorAbsRow && drag.focusCol >= drag.anchorEndCol)
-  )
+/** The buffer cell under the pointer, clamped into the viewport. */
+function pointerCell(drag: SelectionDragState, tab: TabSession): CellPos | null {
+  const viewport = tab.viewport
+  if (!viewport || viewport.lines.length === 0) return null
+  const row = Math.max(0, Math.min(viewport.lines.length - 1, drag.pointerY - drag.origin.y))
+  const col = Math.max(0, Math.min(drag.origin.cols - 1, drag.pointerX - drag.origin.x))
+  return { col, row: viewport.viewportY + row }
 }
 
-function renderMultiClickSelection(
-  renderer: UseMouseHandlersOptions['renderer'],
-  drag: MultiClickDragState,
-  viewportY: number,
-  finishDragging: boolean
-): void {
-  const forward = isForwardSelection(drag)
-  const anchorCol = forward ? drag.anchorStartCol : drag.anchorEndCol
-  const anchorScreenY = drag.baseY + (drag.anchorAbsRow - viewportY)
-  const focusScreenY = drag.baseY + (drag.focusAbsRow - viewportY)
-  renderer.startSelection(drag.target, drag.baseX + anchorCol, anchorScreenY)
-  renderer.updateSelection(drag.target, drag.baseX + drag.focusCol, focusScreenY, {
-    finishDragging,
-  })
-  requestRenderUpTree(drag.target)
-}
-
-function applyMultiClickInitialSelection(
-  renderer: UseMouseHandlersOptions['renderer'],
-  selection: ClickSelectionResult
-): void {
-  renderer.clearSelection()
-  renderer.startSelection(selection.target, selection.baseX + selection.startCol, selection.eventY)
-  // finishDragging:false keeps the renderer in drag mode so subsequent
-  // mouse-drag events can extend the selection through our drag handler.
-  renderer.updateSelection(selection.target, selection.baseX + selection.endCol, selection.eventY, {
-    finishDragging: false,
-  })
-  requestRenderUpTree(selection.target)
-  if (shouldWriteSelectionToClipboard(selection.selectedText)) {
-    copyToSystemClipboard(selection.selectedText)
-  }
+function extendSelection(drag: SelectionDragState, tab: TabSession): void {
+  const pos = pointerCell(drag, tab)
+  if (!pos) return
+  const focus = expandAt((row) => drag.rows.get(row), pos, drag.mode)
+  // A press and release on one cell is a click, not a one-character selection.
+  drag.range =
+    drag.mode === 'char' && isSameRange(focus, drag.anchor) ? null : unionRange(drag.anchor, focus)
+  setTerminalSelection(drag.range && { tabId: drag.tabId, ...drag.range })
 }
 
 export function useMouseHandlers({
@@ -164,7 +132,7 @@ export function useMouseHandlers({
 }: UseMouseHandlersOptions) {
   const separatorDragRef = useRef<ResizeDragState | null>(null)
   const multiClickRef = useRef(new MultiClickDetector())
-  const multiClickDragRef = useRef<MultiClickDragState | null>(null)
+  const selectionDragRef = useRef<SelectionDragState | null>(null)
   // URL under a single-click mouse-down; opened on a release at the same cell.
   const pendingLinkRef = useRef<{ url: string; x: number; y: number } | null>(null)
   const linkTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -173,7 +141,7 @@ export function useMouseHandlers({
   const stateRef = useRef(state)
   stateRef.current = state
 
-  const clearAutoScroll = (drag: MultiClickDragState) => {
+  const clearAutoScroll = (drag: SelectionDragState) => {
     if (drag.autoScrollTimer) {
       clearInterval(drag.autoScrollTimer)
     }
@@ -188,7 +156,7 @@ export function useMouseHandlers({
     return tab.viewport.viewportY < tab.viewport.baseY
   }
 
-  const startAutoScroll = (drag: MultiClickDragState, dir: -1 | 1) => {
+  const startAutoScroll = (drag: SelectionDragState, dir: -1 | 1) => {
     if (drag.autoScrollDir === dir && drag.autoScrollTimer) return
     clearAutoScroll(drag)
     drag.autoScrollDir = dir
@@ -206,7 +174,7 @@ export function useMouseHandlers({
       drag.autoScrollPending = true
       backend.scrollViewport(drag.tabId, dir)
       // The snapshot dispatch will trigger the viewport-change effect below,
-      // which clears autoScrollPending, recaptures lines, and re-extends focus.
+      // which clears autoScrollPending, recaptures rows, and re-extends focus.
     }, AUTO_SCROLL_INTERVAL_MS)
   }
 
@@ -214,9 +182,9 @@ export function useMouseHandlers({
   useEffect(
     () => () => {
       if (linkTimerRef.current) clearTimeout(linkTimerRef.current)
-      const drag = multiClickDragRef.current
+      const drag = selectionDragRef.current
       if (drag) clearAutoScroll(drag)
-      multiClickDragRef.current = null
+      selectionDragRef.current = null
     },
     []
   )
@@ -225,72 +193,54 @@ export function useMouseHandlers({
   // different tab mid-drag: the original tab is no longer visible and we'd
   // otherwise keep pumping scroll commands into a background buffer.
   useEffect(() => {
-    const drag = multiClickDragRef.current
+    const drag = selectionDragRef.current
     if (!drag) return
     if (drag.tabId !== state.activeTabId) {
       clearAutoScroll(drag)
-      multiClickDragRef.current = null
+      selectionDragRef.current = null
     }
   }, [state.activeTabId])
 
-  // Re-extend selection and recapture viewport lines on every snapshot change
-  // while a multi-click drag is in progress. This is what lets auto-scroll
-  // grow the selection even when the mouse hasn't moved.
+  // Recapture rows and re-extend the selection on every snapshot of the drag
+  // tab. This is what lets auto-scroll (or the wheel) grow the selection while
+  // the mouse holds still.
   useEffect(() => {
-    const drag = multiClickDragRef.current
+    const drag = selectionDragRef.current
     if (!drag) return
     const tab = stateRef.current.tabs.find((t: TabSession) => t.id === drag.tabId)
-    if (!tab?.viewport) return
-
     // The effect fires on any tab's snapshot (state.tabs is a fresh array), but
     // the drag tab's viewport object only changes when *its* snapshot lands.
-    // Ignore churn from other tabs so the auto-scroll lockstep below stays 1:1.
-    if (tab.viewport === drag.lastProcessedViewport) return
+    // Ignore churn from other tabs so the auto-scroll lockstep stays 1:1.
+    if (!tab?.viewport || tab.viewport === drag.lastProcessedViewport) return
     drag.lastProcessedViewport = tab.viewport
 
     // A fresh snapshot for the drag tab landed: the backend has caught up, so
     // the auto-scroll loop may issue its next step.
     drag.autoScrollPending = false
 
-    captureViewportLines(drag, tab)
-
-    const viewportRows = tab.viewport.lines.length
-    if (viewportRows === 0) return
-
-    const dragViewportRow = Math.max(
-      0,
-      Math.min(viewportRows - 1, drag.lastEventScreenY - drag.baseY)
-    )
-    const newFocusAbs = tab.viewport.viewportY + dragViewportRow
-    const focusLine = drag.capturedLines.get(newFocusAbs)
-    const focusLineText = focusLine ? getLineText(focusLine) : ''
-    const focusDragCol = drag.lastEventScreenX - drag.baseX
-    const range = computeRangeFromLineText(focusLineText, focusDragCol, drag.mode)
-    const focusStart = range?.startCol ?? Math.max(0, focusDragCol)
-    const focusEnd = range?.endCol ?? Math.max(0, focusDragCol)
-
-    drag.focusAbsRow = newFocusAbs
-    const forward =
-      newFocusAbs > drag.anchorAbsRow ||
-      (newFocusAbs === drag.anchorAbsRow && focusEnd >= drag.anchorEndCol)
-    drag.focusCol = forward ? focusEnd : focusStart
-
-    renderMultiClickSelection(renderer, drag, tab.viewport.viewportY, false)
-  }, [state.tabs, renderer])
+    captureRows(drag, tab)
+    extendSelection(drag, tab)
+  }, [state.tabs])
 
   // Arms a URL open for a single left click; handleTerminalMouseUp fires it.
   // A second click within the multi-click window cancels the pending open, so
   // double-clicking a URL selects it instead.
-  const armLinkOpen = (event: OtuiMouseEvent, tab: TabSession | undefined, clickCount: number) => {
+  const armLinkOpen = (
+    event: OtuiMouseEvent,
+    origin: TerminalContentOrigin,
+    tab: TabSession | undefined,
+    clickCount: number
+  ) => {
     if (linkTimerRef.current) clearTimeout(linkTimerRef.current)
     linkTimerRef.current = null
     pendingLinkRef.current = null
     if (clickCount !== 1) return
 
-    const anchor = getViewportAnchor(event)
-    const line = anchor ? tab?.viewport?.lines[anchor.row] : undefined
-    const url = anchor && line ? getLinkAtColumn(line, anchor.col) : null
-    logInputDebug('link.down', { col: anchor?.col, row: anchor?.row, url })
+    const col = event.x - origin.x
+    const row = event.y - origin.y
+    const line = tab?.viewport?.lines[row]
+    const url = line ? getLinkAtColumn(line, col) : null
+    logInputDebug('link.down', { col, row, url })
     if (url != null) pendingLinkRef.current = { url, x: event.x, y: event.y }
   }
 
@@ -308,7 +258,7 @@ export function useMouseHandlers({
     // output still open: the host terminal can't see them behind our capture.
     if (event.type === 'down' && event.button === 0) {
       const tab = state.tabs.find((t: TabSession) => t.id === targetTabId)
-      armLinkOpen(event, tab, multiClickRef.current.track(event.x, event.y))
+      armLinkOpen(event, origin, tab, multiClickRef.current.track(event.x, event.y))
     }
 
     const sequence = getForwardedMouseSequence(event, origin)
@@ -435,67 +385,49 @@ export function useMouseHandlers({
     }
   }
 
+  // A press starts a selection: one click selects by cell, two by word, three
+  // by line, and dragging extends it in the same unit.
   const handleTerminalClick = (
     event: OtuiMouseEvent,
-    _origin: TerminalContentOrigin,
+    origin: TerminalContentOrigin,
     tabId?: string
   ) => {
     const targetTabId = tabId ?? state.activeTabId
-    if (targetTabId == null || targetTabId === '' || !event.target) {
+    if (targetTabId == null || targetTabId === '') {
       return
     }
 
     const tab = state.tabs.find((t: TabSession) => t.id === targetTabId)
     const clickCount = multiClickRef.current.track(event.x, event.y)
-    armLinkOpen(event, tab, clickCount)
-    if (clickCount < MIN_MULTI_CLICK_SELECTION_COUNT) {
-      // Single-click: clear any stale multi-click drag state so a fresh
-      // char-level drag from opentui's default handler isn't extended by us.
-      const stale = multiClickDragRef.current
-      if (stale) clearAutoScroll(stale)
-      multiClickDragRef.current = null
-      return
+    armLinkOpen(event, origin, tab, clickCount)
+
+    const previous = selectionDragRef.current
+    if (previous) clearAutoScroll(previous)
+    selectionDragRef.current = null
+    // Any other selection goes, ours or one opentui drew in a diff or modal.
+    renderer.clearSelection()
+    setTerminalSelection(null)
+
+    const drag: SelectionDragState = {
+      anchor: { end: { col: 0, row: 0 }, start: { col: 0, row: 0 } },
+      autoScrollDir: 0,
+      autoScrollPending: false,
+      autoScrollTimer: null,
+      lastProcessedViewport: tab?.viewport,
+      mode: SELECTION_MODES[Math.min(clickCount, SELECTION_MODES.length) - 1] ?? 'char',
+      origin,
+      pointerX: event.x,
+      pointerY: event.y,
+      range: null,
+      rows: new Map(),
+      tabId: targetTabId,
     }
-
-    const selection = resolveClickSelection(event, targetTabId, tab, clickCount)
-    if (!selection || !tab?.viewport) {
-      return
-    }
-
-    event.preventDefault()
-    applyMultiClickInitialSelection(renderer, selection)
-
-    const anchor = getViewportAnchor(event)
-    if (anchor) {
-      const anchorAbsRow = tab.viewport.viewportY + selection.row
-      const drag: MultiClickDragState = {
-        anchorAbsRow,
-        anchorEndCol: selection.endCol,
-        anchorStartCol: selection.startCol,
-        autoScrollDir: 0,
-        autoScrollPending: false,
-        autoScrollTimer: null,
-        baseX: anchor.baseX,
-        baseY: anchor.baseY,
-        capturedLines: new Map(),
-        focusAbsRow: anchorAbsRow,
-        focusCol: selection.endCol,
-        lastEventScreenX: event.x,
-        lastEventScreenY: event.y,
-        lastProcessedViewport: tab.viewport,
-        mode: selection.mode,
-        tabId: targetTabId,
-        target: selection.target,
-      }
-      captureViewportLines(drag, tab)
-      multiClickDragRef.current = drag
-    }
-
-    logInputDebug('click.done', {
-      hasSelection: !!(renderer.hasSelection === true),
-      mode: selection.mode,
-      targetSelectable: isPositionedNode(event.target) ? !!event.target.selectable : false,
-    })
+    const pos = tab ? pointerCell(drag, tab) : null
+    if (!tab || !pos) return
+    captureRows(drag, tab)
+    drag.anchor = expandAt((row) => drag.rows.get(row), pos, drag.mode)
+    selectionDragRef.current = drag
+    extendSelection(drag, tab)
   }
 
   const handleTerminalDrag = (
@@ -504,47 +436,24 @@ export function useMouseHandlers({
     _tabId?: string
   ): boolean => {
     pendingLinkRef.current = null
-    const drag = multiClickDragRef.current
+    const drag = selectionDragRef.current
     if (!drag) return false
 
     const tab = stateRef.current.tabs.find((t: TabSession) => t.id === drag.tabId)
     if (!tab?.viewport) return true
 
-    drag.lastEventScreenX = event.x
-    drag.lastEventScreenY = event.y
-    captureViewportLines(drag, tab)
+    drag.pointerX = event.x
+    drag.pointerY = event.y
+    captureRows(drag, tab)
+    extendSelection(drag, tab)
 
-    const viewportRows = tab.viewport.lines.length
-    if (viewportRows === 0) return true
-
-    const rawRow = event.y - drag.baseY
-    const dragViewportRow = Math.max(0, Math.min(viewportRows - 1, rawRow))
-    const dragAbsRow = tab.viewport.viewportY + dragViewportRow
-    const dragCol = event.x - drag.baseX
-
-    const focusLine = drag.capturedLines.get(dragAbsRow)
-    const focusLineText = focusLine ? getLineText(focusLine) : ''
-    const range = computeRangeFromLineText(focusLineText, dragCol, drag.mode)
-    const focusStart = range?.startCol ?? Math.max(0, dragCol)
-    const focusEnd = range?.endCol ?? Math.max(0, dragCol)
-
-    drag.focusAbsRow = dragAbsRow
-    const forward =
-      dragAbsRow > drag.anchorAbsRow ||
-      (dragAbsRow === drag.anchorAbsRow && focusEnd >= drag.anchorEndCol)
-    drag.focusCol = forward ? focusEnd : focusStart
-
-    renderMultiClickSelection(renderer, drag, tab.viewport.viewportY, false)
-
-    // Edge detection: trigger auto-scroll when the pointer sits at (or beyond)
-    // the top/bottom row of the viewport.
+    // Past the top or bottom edge, the text scrolls under the pointer.
+    const row = event.y - drag.origin.y
     let dir: -1 | 0 | 1 = 0
-    if (rawRow <= 0) dir = -1
-    else if (rawRow >= viewportRows - 1) dir = 1
+    if (row < 0) dir = -1
+    else if (row >= tab.viewport.lines.length) dir = 1
 
-    if (dir === 0) {
-      clearAutoScroll(drag)
-    } else if (canScroll(tab, dir)) {
+    if (dir !== 0 && canScroll(tab, dir)) {
       startAutoScroll(drag, dir)
     } else {
       clearAutoScroll(drag)
@@ -564,53 +473,18 @@ export function useMouseHandlers({
       }, MULTI_CLICK_TIMEOUT_MS)
     }
 
-    const drag = multiClickDragRef.current
+    const drag = selectionDragRef.current
     if (!drag) return false
 
     clearAutoScroll(drag)
+    selectionDragRef.current = null
+    if (!drag.range) return true
 
-    const tab = stateRef.current.tabs.find((t: TabSession) => t.id === drag.tabId)
-    if (tab?.viewport) {
-      captureViewportLines(drag, tab)
-      renderMultiClickSelection(renderer, drag, tab.viewport.viewportY, true)
-    }
-
-    const forward = isForwardSelection(drag)
-    const anchorCol = forward ? drag.anchorStartCol : drag.anchorEndCol
-
-    const startAbs = Math.min(drag.anchorAbsRow, drag.focusAbsRow)
-    const endAbs = Math.max(drag.anchorAbsRow, drag.focusAbsRow)
-    const lines: TerminalLine[] = []
-    let missingRows = 0
-    for (let abs = startAbs; abs <= endAbs; abs++) {
-      const line = drag.capturedLines.get(abs)
-      if (line) {
-        lines.push(line)
-      } else {
-        missingRows += 1
-        lines.push({ spans: [] })
-      }
-    }
-    if (missingRows > 0) {
-      // Snapshot coalescing (remote backend, fast scroll bursts) can let the
-      // selection cover rows we never captured. The output gets blank lines
-      // here — surface it for debugging instead of silently corrupting paste.
-      logInputDebug('multiclick.clipboardGap', {
-        endAbs,
-        missingRows,
-        startAbs,
-        totalRows: endAbs - startAbs + 1,
-      })
-    }
-    const anchorIdx = drag.anchorAbsRow - startAbs
-    const focusIdx = drag.focusAbsRow - startAbs
-    const text = extractStreamText(lines, anchorIdx, anchorCol, focusIdx, drag.focusCol)
-    if (text.length > 0 && shouldWriteSelectionToClipboard(text)) {
+    const text = selectionText((row) => drag.rows.get(row), drag.range)
+    if (text.length > 0) {
+      renderer.copyToClipboardOSC52(text)
       copyToSystemClipboard(text)
-      recordMultiClickClipboardWrite()
     }
-
-    multiClickDragRef.current = null
     return true
   }
 
