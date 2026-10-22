@@ -569,7 +569,7 @@ Runtime behavior:
 
 - the indicator is the `aimux.ai-usage` plugin, and it ships off: until it is
   switched on — here, in the Plugins drawer, or with `aimux plugin enable
-aimux.ai-usage` — nothing is spawned, no keychain is read and no request is made
+  aimux.ai-usage` — nothing is spawned, no keychain is read and no request is made
 - the indicator lives on the right side of the status bar and supports click to
   open a details popover
 - Claude data comes from `api.anthropic.com/api/oauth/usage` using the

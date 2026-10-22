@@ -252,7 +252,7 @@ aimux tab create --assistant <id> [--title T] [--cwd .] [--command CMD]
 - **customCommands**: the base command is resolved as
   `--command` > the project's persisted `customCommands[assistant]` > the
   builtin default, so CLI-spawned tabs inherit e.g. `claude
---dangerously-skip-permissions` exactly like the UI. `--command claude` is the
+  --dangerously-skip-permissions` exactly like the UI. `--command claude` is the
   bypass.
 - **`--workspace WT`** pins the tab to an existing workspace id (co-locate several
   tabs in one tree); without it the project's active workspace is used.

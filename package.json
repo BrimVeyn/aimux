@@ -78,12 +78,12 @@
   },
   "devDependencies": {
     "@types/bun": "latest",
-    "@types/node": "^25.9.9",
+    "@types/node": "^26.6.5",
     "@types/react": "^19.3.0",
     "eslint-plugin-perfectionist": "^5.13.0",
     "knip": "^6.42.1",
     "lefthook": "^2.2.2",
-    "oxfmt": "^0.42.0",
+    "oxfmt": "^0.74.0",
     "oxlint": "^1.89.0",
     "oxlint-tsgolint": "^7.0.2004",
     "typescript": "^7.0.2"
