@@ -26,7 +26,7 @@ function tab(overrides: Partial<TabSession> = {}): TabSession {
 }
 
 describe('restart prompt', () => {
-  test('opens once the attach confirms the death, without taking over the keyboard', () => {
+  test('opens once the attach confirms a failure, without taking over the keyboard', () => {
     // A cold start restores every tab as disconnected before the backend has
     // said anything: no prompt yet, or it would flash over live sessions.
     const restored = {
@@ -38,12 +38,23 @@ describe('restart prompt', () => {
     }
     expect(restartPromptHasKeys(restored)).toBe(false)
 
-    const hydrate = {
+    // Killed under us (TM restart, reboot): no prompt, it sleeps and wakes on focus.
+    const killed = appReducer(restored, {
       activeTabId: 'tab-a',
       tabs: [tab({ status: 'disconnected' })],
+      type: 'hydrate-project',
+    })
+    expect(killed.tabs[0]?.hibernated).toBe(true)
+    expect(killed.tabs[0]?.restartPrompt).toBeUndefined()
+
+    // Failed: a respawn may fail the same way, so the user decides.
+    const hydrate = {
+      activeTabId: 'tab-a',
+      tabs: [tab({ status: 'error' })],
       type: 'hydrate-project' as const,
     }
     const dead = { ...appReducer(restored, hydrate), focusMode: 'terminal-input' as const }
+    expect(dead.tabs[0]?.hibernated).toBeUndefined()
     expect(dead.tabs[0]?.restartPrompt).toBe('restore')
     expect(restartPromptHasKeys(dead)).toBe(true)
     // A layer, not a mode: the panes' keymap is still the one in charge.

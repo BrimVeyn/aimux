@@ -56,7 +56,7 @@ The most important modes are:
 - `terminal-input`
 - `git-mode`
 - `settings`
-- `restart-prompt` (over a pane whose session has died)
+- `restart-prompt` (over a pane whose session failed)
 
 The runtime also defines modal modes such as:
 
