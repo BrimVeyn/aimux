@@ -154,6 +154,18 @@ export function findWorkerNameConflict(
   return undefined
 }
 
+export function findWorkspaceTabs(
+  registry: ReadonlyMap<string, DaemonTabEntry>,
+  projectId: string,
+  workspaceId: string
+): string[] {
+  const tabIds: string[] = []
+  for (const [tabId, entry] of registry) {
+    if (entry.projectId === projectId && entry.workspaceId === workspaceId) tabIds.push(tabId)
+  }
+  return tabIds
+}
+
 /**
  * Turn-complete settle window for the status loop, overridable via
  * `AIMUX_TURN_SETTLE_MS` for slow/loaded machines. Falls back to the loop's
@@ -740,7 +752,20 @@ export async function runDaemon(): Promise<void> {
       })
     }
   }
-  const recordWorkspaceRemoved = (targetProjectId: string, workspaceId: string): void => {
+  // An explicit close kills the PTY without an exit event, so the registry and
+  // active-tab bookkeeping that `manager.on('exit')` would do happen here.
+  const closeRegisteredTab = async (projectId: string, tabId: string): Promise<void> => {
+    tabRegistry.delete(tabId)
+    emitDaemonEvent('tab:closed', { projectId, tabId })
+    if (projectActiveTabIds.get(projectId) === tabId) {
+      projectActiveTabIds.set(projectId, null)
+    }
+    await manager.closeTab(projectId, tabId)
+  }
+  const recordWorkspaceRemoved = async (
+    targetProjectId: string,
+    workspaceId: string
+  ): Promise<void> => {
     emitDaemonEvent('workspace:removed', { projectId: targetProjectId, workspaceId })
     if (countUiAttachers() > 0) {
       broadcastAllVersioned(12, {
@@ -757,6 +782,23 @@ export async function runDaemon(): Promise<void> {
         projectId: targetProjectId,
         workspaceId,
       })
+    }
+    // Every remover lands here, and only the TUI's own delete closed the
+    // workspace's tabs: `workspace remove --force`, a plugin's remove, or a
+    // `worker stop` whose close failed left assistants running in a deleted
+    // directory. After the record, so a close that fails can't strand it.
+    const orphans = findWorkspaceTabs(tabRegistry, targetProjectId, workspaceId)
+    const results = await Promise.allSettled(
+      orphans.map(async (tabId) => closeRegisteredTab(targetProjectId, tabId))
+    )
+    for (const [index, result] of results.entries()) {
+      if (result.status === 'rejected') {
+        logDebug('daemon.removeWorkspaceRecord.closeTabFailed', {
+          error: String(result.reason),
+          tabId: orphans[index],
+          workspaceId,
+        })
+      }
     }
   }
 
@@ -797,7 +839,7 @@ export async function runDaemon(): Promise<void> {
           },
           liveTabs: async (targetProjectId) => listTabsForProject(targetProjectId),
           removeWorkspaceRecord: async (targetProjectId, workspaceId) => {
-            recordWorkspaceRemoved(targetProjectId, workspaceId)
+            await recordWorkspaceRemoved(targetProjectId, workspaceId)
           },
           supportsWorkspaceLifecycle: () => true,
         },
@@ -1248,12 +1290,7 @@ export async function runDaemon(): Promise<void> {
                 case 'closeTab': {
                   const projectId = requireProject(socket, attachedProjects)
                   requireNegotiatedVersion(socket, negotiatedVersions)
-                  tabRegistry.delete(message.payload.tabId)
-                  emitDaemonEvent('tab:closed', { projectId, tabId: message.payload.tabId })
-                  if (projectActiveTabIds.get(projectId) === message.payload.tabId) {
-                    projectActiveTabIds.set(projectId, null)
-                  }
-                  await manager.closeTab(projectId, message.payload.tabId)
+                  await closeRegisteredTab(projectId, message.payload.tabId)
                   sendOk(socket, message.id)
                   break
                 }
@@ -1446,7 +1483,10 @@ export async function runDaemon(): Promise<void> {
                 }
                 case 'removeWorkspaceRecord': {
                   requireNegotiatedVersion(socket, negotiatedVersions)
-                  recordWorkspaceRemoved(message.payload.projectId, message.payload.workspaceId)
+                  await recordWorkspaceRemoved(
+                    message.payload.projectId,
+                    message.payload.workspaceId
+                  )
                   sendOk(socket, message.id)
                   break
                 }
