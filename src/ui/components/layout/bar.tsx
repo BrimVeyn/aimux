@@ -1,4 +1,4 @@
-import type { BoxRenderable, CliRenderer, MouseEvent as OtuiMouseEvent } from '@opentui/core'
+import type { BoxRenderable, MouseEvent as OtuiMouseEvent } from '@opentui/core'
 
 import { useRenderer } from '@opentui/react'
 import { useCallback, useEffect, useRef, useState } from 'react'
@@ -29,21 +29,6 @@ export interface BarBoundaryResizeInfo {
  * the content is not flush against the edge. Both grab.
  */
 const GUTTER = 2
-
-/**
- * Set the terminal's mouse pointer by CSS name (OSC 22). opentui's own
- * `setMousePointer` knows six shapes and no resize arrows, so the sequence goes
- * out raw — through the renderer's writer, which orders it with the frames
- * instead of racing them on stdout. Terminals without OSC 22 ignore it.
- *
- * ponytail: `writeOut` is private in opentui's typings. Switch to
- * `setMousePointer` if it ever gains `ew-resize`.
- */
-function setPointerShape(renderer: CliRenderer, shape: 'default' | 'ew-resize'): void {
-  ;(renderer as unknown as { writeOut: (chunk: string) => boolean }).writeOut(
-    `\u001B]22;${shape}\u001B\\`
-  )
-}
 
 /** The rule drawn on the rows that separate the bar's regions. */
 const BOUNDARY_RULE = '─'
@@ -119,7 +104,7 @@ export function Bar({
     onResizeDragEnd?.()
     if (!edgeRef.current.dragging) return
     edgeRef.current.dragging = false
-    if (!edgeRef.current.hovered) setPointerShape(renderer, 'default')
+    if (!edgeRef.current.hovered) renderer.setMousePointer('default')
   }, [onResizeDragEnd, renderer])
   const handleEdgeMouseDown = useCallback(
     (event: OtuiMouseEvent) => {
@@ -132,11 +117,11 @@ export function Bar({
   )
   const handleEdgeMouseOver = useCallback(() => {
     edgeRef.current.hovered = true
-    setPointerShape(renderer, 'ew-resize')
+    renderer.setMousePointer('ew-resize')
   }, [renderer])
   const handleEdgeMouseOut = useCallback(() => {
     edgeRef.current.hovered = false
-    if (!edgeRef.current.dragging) setPointerShape(renderer, 'default')
+    if (!edgeRef.current.dragging) renderer.setMousePointer('default')
   }, [renderer])
 
   if (width === 0) return null

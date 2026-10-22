@@ -181,7 +181,7 @@ async function openEditorInline(
 ): Promise<void> {
   const { renderer } = ctx
   try {
-    renderer.suspend()
+    await renderer.suspend()
     renderer.currentRenderBuffer.clear()
     const proc = Bun.spawn([executable, ...args], {
       cwd,
@@ -195,7 +195,7 @@ async function openEditorInline(
     ctx.dispatch({ message: `editor: ${msg}`, type: 'git-mode-set-message' })
   } finally {
     renderer.currentRenderBuffer.clear()
-    renderer.resume()
+    await renderer.resume()
     renderer.requestRender()
   }
 }

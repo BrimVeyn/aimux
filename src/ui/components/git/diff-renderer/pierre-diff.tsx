@@ -1,6 +1,7 @@
 import type { ScrollBoxRenderable } from '@opentui/core'
 import type { ThemedToken } from 'shiki'
 
+import { useRenderer } from '@opentui/react'
 import {
   forwardRef,
   useCallback,
@@ -60,6 +61,7 @@ export const PierreDiff = forwardRef<PierreDiffHandle, Props>(function PierreDif
   { cacheKey, diff, path, themeId, view },
   ref
 ) {
+  const renderer = useRenderer()
   const t = useTheme()
   const preparation = useDiffPreparation(cacheKey, diff, path, themeId)
   const file = preparation.file ?? undefined
@@ -131,11 +133,11 @@ export const PierreDiff = forwardRef<PierreDiffHandle, Props>(function PierreDif
         if (node) node.scrollTop = target
       }
     }
-    let raf = requestAnimationFrame(() => {
-      raf = requestAnimationFrame(apply)
+    let raf = renderer.requestAnimationFrame(() => {
+      raf = renderer.requestAnimationFrame(apply)
     })
-    return () => cancelAnimationFrame(raf)
-  }, [cacheKey, widths, file, view])
+    return () => renderer.cancelAnimationFrame(raf)
+  }, [cacheKey, file, renderer, view, widths])
 
   if (!file) {
     return (
