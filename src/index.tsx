@@ -92,6 +92,17 @@ if (command === '--help' || command === '-h' || command === 'help') {
   process.exit(await runCli([]))
 }
 
+// opentui needs the Bun named in `engines`. Say so here, in words a user can act
+// on, instead of letting an older runtime fail wherever it first trips inside
+// the renderer. The CLI, daemon and terminal manager above load no opentui.
+const { engines } = await import('../package.json')
+if (!Bun.semver.satisfies(Bun.version, engines.bun)) {
+  process.stderr.write(
+    `aimux needs Bun ${engines.bun}, and this is Bun ${Bun.version}. Run \`bun upgrade\`.\n`
+  )
+  process.exit(1)
+}
+
 // Sequential ON PURPOSE: @opentui/react evaluates @opentui/core as part of its
 // own module graph. Loading both concurrently races the two evaluations and
 // react's chunk can hit `class X extends TextNodeRenderable` while core is

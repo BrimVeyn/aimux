@@ -1,5 +1,6 @@
 import { existsSync } from 'node:fs'
 
+import { engines } from '../package.json'
 import { completionStatus } from './cli/completion/install'
 import { getConfigPath, loadConfigResult } from './config'
 import { ASSISTANT_OPTIONS, isCommandAvailable, parseCommand } from './pty/command-registry'
@@ -52,8 +53,6 @@ function getSummaryLine(failedChecks: DoctorCheck[]): string {
   return `${failedChecks.length} check(s) need attention before aimux will work reliably.`
 }
 
-const MIN_BUN = '>=1.3.14'
-
 export function buildDoctorReport(): DoctorReport {
   const configResult = loadConfigResult()
   const config = configResult.config
@@ -65,10 +64,10 @@ export function buildDoctorReport(): DoctorReport {
     ok: process.platform === 'darwin' || process.platform === 'linux',
   })
 
-  // opentui 0.6 refuses older runtimes; keep in step with `engines.bun`.
-  const bunOk = Bun.semver.satisfies(Bun.version, MIN_BUN)
+  // The Bun the UI's renderer needs; index.tsx refuses to start the UI below it.
+  const bunOk = Bun.semver.satisfies(Bun.version, engines.bun)
   checks.push({
-    details: bunOk ? Bun.version : `${Bun.version} (needs ${MIN_BUN})`,
+    details: bunOk ? Bun.version : `${Bun.version} (needs ${engines.bun})`,
     name: 'bun',
     ok: bunOk,
   })
