@@ -129,6 +129,8 @@ export interface TerminalSpan {
   italic?: boolean
   underline?: boolean
   cursor?: boolean
+  /** OSC 8 hyperlink target. Its text is often a label (`google.com`), not the URL. */
+  link?: string
 }
 
 export interface TerminalLine {

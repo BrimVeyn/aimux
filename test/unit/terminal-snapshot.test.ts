@@ -4,6 +4,27 @@ import { describe, expect, test } from 'bun:test'
 import { areTerminalSnapshotsEqual, snapshotTerminal } from '../../src/pty/terminal-snapshot'
 
 describe('snapshotTerminal', () => {
+  test('keeps the OSC 8 target behind a hyperlink label', async () => {
+    const terminal = new Terminal({ allowProposedApi: true, cols: 20, rows: 4 })
+
+    await new Promise<void>((resolve) => {
+      terminal.write(
+        'see \u001b]8;;https://google.com\u001b\\google.com\u001b]8;;\u001b\\ ok',
+        resolve
+      )
+    })
+
+    const spans = snapshotTerminal(terminal).lines[0]?.spans ?? []
+
+    expect(spans.find((span) => span.link !== undefined)).toMatchObject({
+      link: 'https://google.com',
+      text: 'google.com',
+    })
+    expect(spans.filter((span) => span.link !== undefined)).toHaveLength(1)
+
+    terminal.dispose()
+  })
+
   test('preserves ANSI foreground colors', async () => {
     const terminal = new Terminal({ allowProposedApi: true, cols: 20, rows: 4 })
 

@@ -15,9 +15,15 @@ describe('openUrlCommand', () => {
     expect(openUrlCommand('linux', true, URL)).toEqual(['explorer.exe', URL])
   })
 
-  test('refuses anything that is not plain https', () => {
+  test('allows http for local dev servers', () => {
+    expect(openUrlCommand('darwin', false, 'http://localhost:3000')).toEqual([
+      'open',
+      'http://localhost:3000',
+    ])
+  })
+
+  test('refuses anything that is not plain http(s)', () => {
     for (const bad of [
-      'http://example.com',
       'file:///etc/passwd',
       'javascript:alert(1)',
       'https://example.com a b',
