@@ -58,7 +58,7 @@ import { toast } from './state/toast-store'
 import { KeymapContext } from './ui/keymap-context'
 import { usePluginHost } from './ui/plugin-host'
 import { RootView } from './ui/root'
-import { applyTheme, setMode, setTransparent } from './ui/theme'
+import { applyTheme, getCurrentThemeId, setMode, setTransparent } from './ui/theme'
 import { isKnownThemeId, type ThemeId } from './ui/themes'
 import { loadUserThemes } from './ui/user-themes'
 import {
@@ -68,6 +68,30 @@ import {
 } from './update/version-check'
 
 const PROJECT_SAVE_DEBOUNCE_MS = 250
+
+/**
+ * The user's theme, applied before anything is drawn — including the screens
+ * the backend bootstrap renders before `App` exists (the breaking-update
+ * prompt), which would otherwise show the default theme.
+ */
+export function applyStartupTheme(resolvedConfig: ResolvedConfig): void {
+  // Before the first `applyTheme`: a persisted `themeId` naming a theme from
+  // `<profile>/themes/` has to resolve, or the app would fall back to
+  // `aimux` and then write that fallback back to the config file.
+  const userThemes = loadUserThemes()
+  for (const issue of userThemes.issues) {
+    toast.error(`theme ${issue.file}: ${issue.message}`)
+  }
+  const config = loadConfig()
+  const persisted =
+    config.themeId != null && config.themeId !== '' && isKnownThemeId(config.themeId)
+      ? config.themeId
+      : undefined
+  applyTheme(persisted ?? resolvedConfig.theme?.initialId ?? 'aimux')
+  if (resolvedConfig.theme?.initialMode) setMode(resolvedConfig.theme.initialMode)
+  if (config.themeMode) setMode(config.themeMode)
+  setTransparent(config.themeTransparent ?? false)
+}
 
 export function App({
   backend,
@@ -114,26 +138,8 @@ export function App({
 
   const renderer = useRenderer()
   const dimensions = useTerminalDimensions()
-  const [themeId, setThemeId] = useState<ThemeId>(() => {
-    // Before the first `applyTheme`: a persisted `themeId` naming a theme from
-    // `<profile>/themes/` has to resolve, or the app would fall back to
-    // `aimux` and then write that fallback back to the config file.
-    const userThemes = loadUserThemes()
-    for (const issue of userThemes.issues) {
-      toast.error(`theme ${issue.file}: ${issue.message}`)
-    }
-    const config = loadConfig()
-    const persisted =
-      config.themeId != null && config.themeId !== '' && isKnownThemeId(config.themeId)
-        ? config.themeId
-        : undefined
-    const initial: ThemeId = persisted ?? resolvedConfig.theme?.initialId ?? 'aimux'
-    applyTheme(initial)
-    if (resolvedConfig.theme?.initialMode) setMode(resolvedConfig.theme.initialMode)
-    if (config.themeMode) setMode(config.themeMode)
-    setTransparent(config.themeTransparent ?? false)
-    return initial
-  })
+  // Applied by `applyStartupTheme` before the first render, App or not.
+  const [themeId, setThemeId] = useState<ThemeId>(getCurrentThemeId)
   // Initialize zustand store with computed initial state on first render. Using
   // useState's lazy initializer guarantees this runs exactly once before any
   // selector reads. We discard the value — the store is the source of truth.

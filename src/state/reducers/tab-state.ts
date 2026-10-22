@@ -372,15 +372,24 @@ export function reduceTabState(state: AppState, action: AppAction): AppState | n
       // client, so keep what it already holds for the tabs it knows.
       const ownedById = new Map(state.tabs.map((entry) => [entry.id, entry]))
       // The attach is also what confirms a tab is dead rather than merely
-      // restored: only now does a `disconnected`/`error` tab get its restart
-      // prompt, and one already up keeps its selection.
+      // restored. A `disconnected` tab was killed under us (TM restart, reboot)
+      // — a tab whose program exits on its own is closed instead — so it sleeps
+      // like a hibernated one and wakes on focus. Only an `error` tab, which a
+      // respawn may fail the same way, gets the restart prompt.
       const hydratedTabs = action.tabs.map((entry) => {
         const owned = ownedById.get(entry.id)
-        const dead = entry.status === 'disconnected' || entry.status === 'error'
-        const restartPrompt = dead ? (owned?.restartPrompt ?? 'restore') : undefined
+        const hibernated = entry.status === 'disconnected' ? true : undefined
+        const restartPrompt =
+          entry.status === 'error' ? (owned?.restartPrompt ?? 'restore') : undefined
         return owned
-          ? { ...entry, command: owned.command, restartPrompt, sessionId: owned.sessionId }
-          : { ...entry, restartPrompt }
+          ? {
+              ...entry,
+              command: owned.command,
+              hibernated,
+              restartPrompt,
+              sessionId: owned.sessionId,
+            }
+          : { ...entry, hibernated, restartPrompt }
       })
       const visibleForWorkspace = filterTabsForActiveWorkspace(hydratedTabs, currentProject)
       const visibleIds = new Set(visibleForWorkspace.map((t) => t.id))
