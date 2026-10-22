@@ -281,14 +281,13 @@ export interface TabSession {
    */
   sessionId?: string
   /**
-   * Deliberately put to sleep: the PTY is gone, the frozen viewport stays, and
-   * focusing the tab resumes it. Distinct from the `disconnected` it rides on —
-   * that also means "restored from a snapshot after a restart" — and only used
-   * to tell the two apart in the sidebar glyph, the pane overlay, and the wake.
-   * Ephemeral — never persisted, never on the wire: a restart turns every tab
-   * disconnected anyway, and Ctrl+r resumes them just the same.
+   * Killed under us (terminal-manager restart, reboot) rather than failed: the
+   * PTY is gone, the frozen viewport stays, and focusing the tab respawns it
+   * with `--resume`. Set when the attach confirms the death; an `error` tab
+   * gets the restart prompt instead. Ephemeral — never persisted, never on the
+   * wire.
    */
-  hibernated?: boolean
+  restoreOnFocus?: boolean
   /**
    * The restore/close prompt drawn over a dead pane, holding the option it has
    * selected; absent when there is no prompt. Set only once the backend has
@@ -1132,7 +1131,6 @@ export type SideEffect =
       keepConflicts?: boolean
     }
   | { type: 'load-workspace-move-stats' }
-  | { type: 'hibernate-workspace'; workspaceId: string }
   | { type: 'toggle-transparent' }
   | { type: 'toggle-mode' }
   | { type: 'open-file-in-editor'; path: string }
@@ -1306,7 +1304,6 @@ export type TabAction =
   | { type: 'reorder-active-tab'; delta: number }
   | { type: 'reorder-tabs'; orderedTabIds: string[] }
   | { type: 'reset-tab-project'; tabId: string }
-  | { type: 'hibernate-tab'; tabId: string }
   | { type: 'select-restart-option'; tabId: string; option: 'restore' | 'close' }
   | {
       type: 'rename-tab'

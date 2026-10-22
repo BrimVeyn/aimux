@@ -638,8 +638,8 @@ export function TerminalPane({
         <box position="absolute" bottom={0} left={0} backgroundColor={editorBg}>
           {tab?.status === 'disconnected' ? (
             <text fg={t.warning}>
-              {tab.hibernated === true
-                ? 'Hibernated. Resuming…'
+              {tab.restoreOnFocus === true
+                ? 'Restored snapshot. Resumes when focused.'
                 : 'Restored snapshot. Press Ctrl+r to restart this tab.'}
             </text>
           ) : null}

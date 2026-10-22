@@ -44,7 +44,7 @@ describe('restart prompt', () => {
       tabs: [tab({ status: 'disconnected' })],
       type: 'hydrate-project',
     })
-    expect(killed.tabs[0]?.hibernated).toBe(true)
+    expect(killed.tabs[0]?.restoreOnFocus).toBe(true)
     expect(killed.tabs[0]?.restartPrompt).toBeUndefined()
 
     // Failed: a respawn may fail the same way, so the user decides.
@@ -54,7 +54,7 @@ describe('restart prompt', () => {
       type: 'hydrate-project' as const,
     }
     const dead = { ...appReducer(restored, hydrate), focusMode: 'terminal-input' as const }
-    expect(dead.tabs[0]?.hibernated).toBeUndefined()
+    expect(dead.tabs[0]?.restoreOnFocus).toBeUndefined()
     expect(dead.tabs[0]?.restartPrompt).toBe('restore')
     expect(restartPromptHasKeys(dead)).toBe(true)
     // A layer, not a mode: the panes' keymap is still the one in charge.
