@@ -156,11 +156,16 @@ export async function createGitWorktree({
   // branch — `git push` either refuses it (push.default=simple) or, worse,
   // pushes the branch onto main. Forking from a local branch never set tracking,
   // so this only pins down what refreshing the base would have changed.
+  // `--quiet` keeps git's checkout progress out of stderr: on a large repo it
+  // is hundreds of lines that bury the one error line under them.
   const result =
-    await $`git -C ${repoPath} worktree add --no-track -b ${branchName} ${targetPath} ${forkRef}`
+    await $`git -C ${repoPath} worktree add --quiet --no-track -b ${branchName} ${targetPath} ${forkRef}`
       .quiet()
       .nothrow()
-  if (result.exitCode !== 0) {
+  // A failing post-checkout hook makes git exit non-zero AFTER the checkout is
+  // done. The worktree exists on our new branch, so it is created: throwing
+  // here would leave it on disk with no record, invisible in the sidebar.
+  if (result.exitCode !== 0 && (await getCurrentBranch(targetPath)) !== branchName) {
     // Always name the repository. A bare "fatal: not a valid object name: 'X'"
     // reads as a ref-resolution bug when the real cause is that git ran in a
     // repository the caller did not mean to target.

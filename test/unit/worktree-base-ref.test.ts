@@ -150,3 +150,29 @@ test('a repo with no origin at all still yields a usable base', async () => {
   // refuse to create a workspace.
   expect(await resolveWorktreeBaseRef(solo, 'main')).toBe('main')
 })
+
+test('a failing post-checkout hook does not fail a worktree git did create', async () => {
+  // A repo hook (e.g. lefthook refusing an outdated binary) exits non-zero after
+  // the checkout is done. git reports that as a failed `worktree add`, yet the
+  // worktree is there — throwing would leave it on disk with no record.
+  const hooked = join(root, 'hooked')
+  await $`git clone ${remote} ${hooked}`.quiet()
+  await writeFile(
+    join(hooked, '.git/hooks/post-checkout'),
+    '#!/bin/sh\necho hook broke >&2\nexit 1\n',
+    {
+      mode: 0o755,
+    }
+  )
+  const target = join(root, 'workspace-hooked')
+
+  await createGitWorktree({
+    baseRef: 'main',
+    branchName: 'aimux/hooked',
+    refreshBase: false,
+    repoPath: hooked,
+    targetPath: target,
+  })
+
+  expect(await resolveGitRef(target, 'HEAD')).toBe((await resolveGitRef(hooked, 'main')) ?? 'none')
+})
