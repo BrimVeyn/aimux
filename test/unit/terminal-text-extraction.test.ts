@@ -5,7 +5,7 @@ import type { TerminalLine } from '../../src/state/types'
 import {
   extractStreamText,
   getLineText,
-  getUrlAtColumn,
+  getLinkAtColumn,
   getWordAtColumn,
 } from '../../src/input/terminal-text-extraction'
 
@@ -149,10 +149,21 @@ test('extractStreamText rtrims single-line trailing spaces (row padding is synth
   expect(extractStreamText(lines, 0, 0, 0, 6)).toBe('abc')
 })
 
-test('getUrlAtColumn finds the URL under the column and trims trailing punctuation', () => {
-  const line = 'see (https://example.com/a?b=1). or http://localhost:3000'
-  expect(getUrlAtColumn(line, 10)).toBe('https://example.com/a?b=1')
-  expect(getUrlAtColumn(line, 30)).toBeNull()
-  expect(getUrlAtColumn(line, 2)).toBeNull()
-  expect(getUrlAtColumn(line, line.length - 1)).toBe('http://localhost:3000')
+test('getLinkAtColumn finds a plain URL and trims trailing punctuation', () => {
+  const text = 'see (https://example.com/a?b=1). or http://localhost:3000'
+  const line = makeLine(text)
+  expect(getLinkAtColumn(line, 10)).toBe('https://example.com/a?b=1')
+  expect(getLinkAtColumn(line, 30)).toBeNull()
+  expect(getLinkAtColumn(line, 2)).toBeNull()
+  expect(getLinkAtColumn(line, text.length - 1)).toBe('http://localhost:3000')
+})
+
+test('getLinkAtColumn prefers the OSC 8 target behind a label', () => {
+  const line: TerminalLine = {
+    spans: [{ text: '⏺ ' }, { link: 'https://google.com', text: 'google.com' }, { text: '  ' }],
+  }
+  expect(getLinkAtColumn(line, 2)).toBe('https://google.com')
+  expect(getLinkAtColumn(line, 11)).toBe('https://google.com')
+  expect(getLinkAtColumn(line, 0)).toBeNull()
+  expect(getLinkAtColumn(line, 12)).toBeNull()
 })

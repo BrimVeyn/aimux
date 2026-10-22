@@ -10,7 +10,7 @@ import type { AppState, BarSide, TabSession, TerminalLine } from '../state/types
 
 import { logInputDebug } from '../debug/input-log'
 import { MULTI_CLICK_TIMEOUT_MS, MultiClickDetector } from '../input/multi-click-detector'
-import { extractStreamText, getLineText, getUrlAtColumn } from '../input/terminal-text-extraction'
+import { extractStreamText, getLineText, getLinkAtColumn } from '../input/terminal-text-extraction'
 import { copyToSystemClipboard } from '../platform/clipboard'
 import { openUrl } from '../platform/open-url'
 import { bump } from '../services/aimux-counters'
@@ -289,7 +289,7 @@ export function useMouseHandlers({
 
     const anchor = getViewportAnchor(event)
     const line = anchor ? tab?.viewport?.lines[anchor.row] : undefined
-    const url = anchor && line ? getUrlAtColumn(getLineText(line), anchor.col) : null
+    const url = anchor && line ? getLinkAtColumn(line, anchor.col) : null
     logInputDebug('link.down', { col: anchor?.col, row: anchor?.row, url })
     if (url != null) pendingLinkRef.current = { url, x: event.x, y: event.y }
   }

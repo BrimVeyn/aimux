@@ -40,7 +40,8 @@ function isTerminalLine(value: unknown): value is TerminalLine {
       (span.bold === undefined || isBoolean(span.bold)) &&
       (span.italic === undefined || isBoolean(span.italic)) &&
       (span.underline === undefined || isBoolean(span.underline)) &&
-      (span.cursor === undefined || isBoolean(span.cursor))
+      (span.cursor === undefined || isBoolean(span.cursor)) &&
+      (span.link === undefined || isString(span.link))
     )
   })
 }

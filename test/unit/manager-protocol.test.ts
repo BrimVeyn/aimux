@@ -13,8 +13,8 @@ import {
 
 describe('manager protocol', () => {
   test('requires the v13 breaking-release boundary', () => {
-    expect(MANAGER_PROTOCOL_MIN_VERSION).toBe(13)
-    expect(MANAGER_PROTOCOL_VERSION).toBe(13)
+    expect(MANAGER_PROTOCOL_MIN_VERSION).toBe(14)
+    expect(MANAGER_PROTOCOL_VERSION).toBe(14)
   })
 
   test('selects highest mutually supported version', () => {

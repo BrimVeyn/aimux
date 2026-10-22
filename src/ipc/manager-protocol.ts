@@ -49,8 +49,14 @@ import {
 // makes a probing program (opencode) paint an opaque background over a
 // transparent pane. Raising MIN turns "silently still broken" into the one
 // forced restart.
-export const MANAGER_PROTOCOL_MIN_VERSION = 13
-export const MANAGER_PROTOCOL_VERSION = 13
+//
+// v14: breaking release boundary — `TerminalSpan` carries an optional `link`
+// (the cell's OSC 8 target) so a click on a hyperlink label like Claude
+// Code's `google.com` opens its real URL. The field is additive on the wire,
+// but a TM that predates it never sends it, so labelled links would stay
+// silently dead until the user happened to restart the TM.
+export const MANAGER_PROTOCOL_MIN_VERSION = 14
+export const MANAGER_PROTOCOL_VERSION = 14
 
 /**
  * Capability strings advertised by *this* process in its `helloResult`. New
@@ -251,7 +257,8 @@ function isTerminalSpan(value: unknown): boolean {
     (value.bold === undefined || typeof value.bold === 'boolean') &&
     (value.italic === undefined || typeof value.italic === 'boolean') &&
     (value.underline === undefined || typeof value.underline === 'boolean') &&
-    (value.cursor === undefined || typeof value.cursor === 'boolean')
+    (value.cursor === undefined || typeof value.cursor === 'boolean') &&
+    (value.link === undefined || isString(value.link))
   )
 }
 
