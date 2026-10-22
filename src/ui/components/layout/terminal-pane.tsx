@@ -27,6 +27,7 @@ import { useAppStore } from '../../../state/app-store'
 import { dispatchGlobal, runSideEffectGlobal } from '../../../state/dispatch-ref'
 import { type ContextMenuItem, openContextMenu } from '../../context-menu/controller'
 import { resolvePaletteIndex } from '../../host-palette'
+import { useSelectionInk } from '../../selection-ink'
 import { getCurrentTheme, useTheme } from '../../theme'
 import { ContextMenuBox } from '../overlays/context-menu/context-menu-box'
 
@@ -257,6 +258,7 @@ export function TerminalPane({
   tabId,
 }: TerminalPaneProps) {
   const t = useTheme()
+  const selectionInk = useSelectionInk()
   const setContentBox = usePaneSizeReport(tabId, !!tab, onMeasure)
   const editorBg = t.background
   const paneIsActive = isActive ?? true
@@ -534,39 +536,28 @@ export function TerminalPane({
         onMouseUp={forwardMouseEvent}
       >
         {!tab ? (
+          // Keep this at a fixed row count: adding a line shifts everything
+          // under a centred column, and the vacated cells are not repainted —
+          // the old text bleeds through the new spaces. The Ctrl+n key is in
+          // the status bar already, so the button is the only call to action.
           <box flexGrow={1} justifyContent="center" alignItems="center" flexDirection="column">
-            <text fg={t.textMuted}>· · ·</text>
-            <text fg={t.textMuted}> </text>
-            {emptyProjectName !== '' ? (
-              <box flexDirection="row">
-                <text fg={t.text}>{emptyProjectName}</text>
-                {emptyWorkspaceName !== '' && emptyWorkspaceName !== emptyProjectName ? (
-                  <>
-                    <text fg={t.textMuted}> / </text>
-                    <text fg={t.text}>{emptyWorkspaceName}</text>
-                  </>
-                ) : null}
-              </box>
-            ) : null}
-            <text fg={t.textMuted}>has no tabs</text>
-            <text fg={t.textMuted}> </text>
-            {/* Keep this at a fixed row count: adding a line shifts everything
-                under a centred column, and the vacated cells are not repainted
-                — the old text bleeds through the new spaces. */}
-            <box flexDirection="row">
-              <text fg={t.textMuted}>Press </text>
-              <text fg={t.primary}>Ctrl+n</text>
-              <text fg={t.textMuted}> to launch an assistant</text>
-            </box>
+            <text fg={t.text}>
+              {emptyProjectName}
+              {emptyWorkspaceName !== '' && emptyWorkspaceName !== emptyProjectName ? (
+                <>
+                  <span fg={t.textMuted}> / </span>
+                  {emptyWorkspaceName}
+                </>
+              ) : null}
+            </text>
+            <text fg={t.textMuted}>No tabs</text>
             <box
-              flexDirection="row"
-              justifyContent="center"
               marginTop={1}
               paddingX={2}
-              backgroundColor={t.backgroundPanel}
+              backgroundColor={t.primary}
               onMouseDown={handleNoTabMouseDown}
             >
-              <text fg={t.text}>New assistant</text>
+              <text fg={selectionInk}>New assistant</text>
             </box>
           </box>
         ) : (
