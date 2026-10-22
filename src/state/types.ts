@@ -2,7 +2,7 @@
 // re-exported here so every import site in `src/` keeps working unchanged.
 //
 // They used to be declared in both places, "kept structurally identical" by
-// hand. They were not: `TabSession.sessionId`, `TabSession.hibernated`,
+// hand. They were not: `TabSession.sessionId`, `TabSession.hibernated` (now `restoreOnFocus`),
 // `ProjectRecord.defaultBaseRef`, `ProjectRecord.collapsed`,
 // `PersistedTabSnapshot.workerName` and the terminal cursor/palette fields had
 // all landed on one side only. A public plugin API cannot rest on that, so

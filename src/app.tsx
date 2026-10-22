@@ -472,7 +472,7 @@ export function App({
 
   useSetupRunner(state, sideEffectCtx)
 
-  // Waking is the counterpart of hibernating, and focus is the only signal it
+  // A tab killed under us (TM restart, reboot) wakes on focus, the only signal it
   // needs: you looked at the tab, so you want it back. Keyed on the id as well
   // as the flag so switching between two sleeping tabs wakes the second one.
   // `restart-tab` already does the whole job — dispose, reset, respawn — and the
@@ -481,9 +481,9 @@ export function App({
   wakeTabRef.current = activeTab
   useEffect(() => {
     const tab = wakeTabRef.current
-    if (tab?.hibernated !== true) return
+    if (tab?.restoreOnFocus !== true) return
     runSideEffectGlobal({ tab, type: 'restart-tab' })
-  }, [activeTab?.id, activeTab?.hibernated])
+  }, [activeTab?.id, activeTab?.restoreOnFocus])
 
   function processKeyResult(result: KeyResult, modeId: ModeId): void {
     for (const action of result.actions) {

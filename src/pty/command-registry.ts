@@ -252,7 +252,7 @@ function runsVendorProgram(
  * a conversation under that id, claim it otherwise.
  *
  * One function for both directions on purpose: every spawn site (new tab,
- * split, Ctrl+r, waking a hibernated tab) wants the same thing — "be this
+ * split, Ctrl+r, waking a tab on focus) wants the same thing — "be this
  * conversation" — and the filesystem, not the call site, is what knows whether
  * that conversation exists yet. A caller that had to pick would get it wrong
  * exactly once: on the tab that was opened and never typed into.

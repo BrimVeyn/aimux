@@ -374,22 +374,22 @@ export function reduceTabState(state: AppState, action: AppAction): AppState | n
       // The attach is also what confirms a tab is dead rather than merely
       // restored. A `disconnected` tab was killed under us (TM restart, reboot)
       // — a tab whose program exits on its own is closed instead — so it sleeps
-      // like a hibernated one and wakes on focus. Only an `error` tab, which a
+      // with its last screen and wakes on focus. Only an `error` tab, which a
       // respawn may fail the same way, gets the restart prompt.
       const hydratedTabs = action.tabs.map((entry) => {
         const owned = ownedById.get(entry.id)
-        const hibernated = entry.status === 'disconnected' ? true : undefined
+        const restoreOnFocus = entry.status === 'disconnected' ? true : undefined
         const restartPrompt =
           entry.status === 'error' ? (owned?.restartPrompt ?? 'restore') : undefined
         return owned
           ? {
               ...entry,
               command: owned.command,
-              hibernated,
               restartPrompt,
+              restoreOnFocus,
               sessionId: owned.sessionId,
             }
-          : { ...entry, hibernated, restartPrompt }
+          : { ...entry, restartPrompt, restoreOnFocus }
       })
       const visibleForWorkspace = filterTabsForActiveWorkspace(hydratedTabs, currentProject)
       const visibleIds = new Set(visibleForWorkspace.map((t) => t.id))
@@ -565,8 +565,8 @@ export function reduceTabState(state: AppState, action: AppAction): AppState | n
             buffer: '',
             errorMessage: undefined,
             exitCode: undefined,
-            hibernated: undefined,
             restartPrompt: undefined,
+            restoreOnFocus: undefined,
             status: 'starting',
             terminalModes: createDefaultTerminalModes(),
             viewport: undefined,
@@ -574,20 +574,6 @@ export function reduceTabState(state: AppState, action: AppAction): AppState | n
         },
         action.tabId
       )
-    case 'hibernate-tab':
-      // Deliberately keeps `buffer` and `viewport`: the frozen screen is the
-      // whole point — you should still see what the assistant last said. That is
-      // the one thing separating this from `reset-tab-project`, which wipes both
-      // because it is about to draw a live PTY over them.
-      return {
-        ...state,
-        tabs: updateTab(state.tabs, action.tabId, (tab) => ({
-          ...tab,
-          activity: 'idle',
-          hibernated: true,
-          status: 'disconnected',
-        })),
-      }
     case 'append-tab-buffer':
       return {
         ...state,
