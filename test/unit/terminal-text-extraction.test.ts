@@ -5,6 +5,7 @@ import type { TerminalLine } from '../../src/state/types'
 import {
   extractStreamText,
   getLineText,
+  getUrlAtColumn,
   getWordAtColumn,
 } from '../../src/input/terminal-text-extraction'
 
@@ -146,4 +147,12 @@ test('extractStreamText rtrims single-line trailing spaces (row padding is synth
   // ghosting, so trailing spaces on a single-row copy are padding, not content.
   const lines = [makeLine('abc   ')]
   expect(extractStreamText(lines, 0, 0, 0, 6)).toBe('abc')
+})
+
+test('getUrlAtColumn finds the URL under the column and trims trailing punctuation', () => {
+  const line = 'see (https://example.com/a?b=1). or http://localhost:3000'
+  expect(getUrlAtColumn(line, 10)).toBe('https://example.com/a?b=1')
+  expect(getUrlAtColumn(line, 30)).toBeNull()
+  expect(getUrlAtColumn(line, 2)).toBeNull()
+  expect(getUrlAtColumn(line, line.length - 1)).toBe('http://localhost:3000')
 })

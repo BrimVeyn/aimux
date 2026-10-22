@@ -79,3 +79,14 @@ export function getWordAtColumn(
 
   return { endCol, startCol, text: lineText.slice(startCol, endCol) }
 }
+
+const URL_PATTERN = /https?:\/\/[^\s<>"'`]+/g
+
+/** URL under `column`, or null. Trailing prose punctuation is not part of it. */
+export function getUrlAtColumn(lineText: string, column: number): string | null {
+  for (const match of lineText.matchAll(URL_PATTERN)) {
+    const url = match[0].replace(/[.,;:!?)\]}]+$/, '')
+    if (column >= match.index && column < match.index + url.length) return url
+  }
+  return null
+}

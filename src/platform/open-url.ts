@@ -3,12 +3,13 @@ import { toast } from '../state/toast-store'
 import { detectClipboardPlatform } from './clipboard'
 
 /**
- * URLs here come from the GitHub API, i.e. outside the process. Handing an
- * arbitrary scheme to the OS opener is a code-execution path (`file://`,
- * `javascript:`, custom app handlers), so only plain https is allowed through.
+ * URLs here come from outside the process (GitHub API, terminal output).
+ * Handing an arbitrary scheme to the OS opener is a code-execution path
+ * (`file://`, `javascript:`, custom app handlers), so only plain http(s) is
+ * allowed through — http for local dev servers printed in a terminal.
  */
 function isSafeUrl(url: string): boolean {
-  return /^https:\/\/[^\s]+$/.test(url)
+  return /^https?:\/\/[^\s]+$/.test(url)
 }
 
 export function openUrlCommand(platform: string, isWsl: boolean, url: string): string[] | null {
