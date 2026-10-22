@@ -325,6 +325,21 @@ export function getDefaultKeymapConfig(): ResolvedKeymapConfig {
     )
 
     // -----------------------------------------------------------------------
+    // Restart prompt: drawn over the active pane once its session has died.
+    // Layered over the panes' own mode — a key it does not bind falls through.
+    // -----------------------------------------------------------------------
+    .mode('restart-prompt', (m) =>
+      m
+        .map('r', actions.restartTab, 'Restore')
+        .map('c', actions.closeTab, 'Close')
+        .map('<Left>', actions.selectRestartOption('restore'))
+        .map('<Up>', actions.selectRestartOption('restore'))
+        .map('<Right>', actions.selectRestartOption('close'))
+        .map('<Down>', actions.selectRestartOption('close'))
+        .map('<CR>', actions.confirmRestartOption, 'Confirm')
+    )
+
+    // -----------------------------------------------------------------------
     // Modal: standalone workspace delete confirmation (sidebar "Remove workspace")
     // -----------------------------------------------------------------------
     .mode('modal.workspace-delete-confirm', (m) =>

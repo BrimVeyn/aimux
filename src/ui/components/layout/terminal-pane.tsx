@@ -27,8 +27,12 @@ import { useAppStore } from '../../../state/app-store'
 import { dispatchGlobal, runSideEffectGlobal } from '../../../state/dispatch-ref'
 import { type ContextMenuItem, openContextMenu } from '../../context-menu/controller'
 import { resolvePaletteIndex } from '../../host-palette'
+import { useSelectionInk } from '../../selection-ink'
 import { getCurrentTheme, useTheme } from '../../theme'
+import { uiTokens } from '../../ui-tokens'
+import { ModalShell } from '../modals/shared/modal-shell'
 import { ContextMenuBox } from '../overlays/context-menu/context-menu-box'
+import { ListItem } from '../primitives/list-item'
 
 interface TerminalPaneProps {
   tab?: TabSession
@@ -172,6 +176,7 @@ function useHardwareCursor(
 }
 
 const NOOP = (): void => {}
+const stopPropagation = (event: OtuiMouseEvent): void => event.stopPropagation()
 
 // aimux renders the exact visible window and owns scrollback through the backend
 // xterm buffer (viewportY); opentui's built-in text scroll (_scrollY) must never
@@ -257,6 +262,7 @@ export function TerminalPane({
   tabId,
 }: TerminalPaneProps) {
   const t = useTheme()
+  const ink = useSelectionInk()
   const setContentBox = usePaneSizeReport(tabId, !!tab, onMeasure)
   const editorBg = t.background
   const paneIsActive = isActive ?? true
@@ -507,6 +513,17 @@ export function TerminalPane({
     // workspace to put a tab in — the effect owns that rule.
     runSideEffectGlobal({ type: 'open-new-tab' })
   }, [])
+  const restartFromPrompt = useCallback(() => {
+    if (tab) runSideEffectGlobal({ tab, type: 'restart-tab' })
+  }, [tab])
+  // By id, not "the active tab" — the click may land on a pane that is not.
+  // The same pair the right-click "Close pane" sends.
+  const closeFromPrompt = useCallback(() => {
+    if (!(tabId != null && tabId !== '')) return
+    dispatchGlobal({ tabId, type: 'close-pane' })
+    runSideEffectGlobal({ tabId, type: 'close-tab' })
+  }, [tabId])
+  const restartPromptOpen = tab?.restartPrompt !== undefined
   const handleContentMouseDown = useCallback(
     (e: OtuiMouseEvent) => {
       e.stopPropagation()
@@ -590,7 +607,41 @@ export function TerminalPane({
           </box>
         )}
       </ContextMenuBox>
-      {tab?.status === 'disconnected' || (tab?.errorMessage != null && tab.errorMessage !== '') ? (
+      {tab && restartPromptOpen ? (
+        <ModalShell
+          title={tab.title}
+          subtitle={
+            tab.errorMessage != null && tab.errorMessage !== '' ? tab.errorMessage : 'Session ended'
+          }
+          // Only where the keys actually land: the active pane, while the panes
+          // have the keyboard.
+          keybindsModeId={
+            paneIsActive && (focusMode === 'navigation' || focusMode === 'terminal-input')
+              ? 'restart-prompt'
+              : undefined
+          }
+          width={Math.min(uiTokens.modalWidth.md, contentOrigin.cols)}
+          onBackdropMouseDown={forwardMouseEvent}
+        >
+          {/* Stops here: the backdrop would re-activate a pane the click just closed. */}
+          <box flexDirection="row" gap={1} onMouseDown={stopPropagation}>
+            <ListItem
+              active={tab.restartPrompt === 'restore'}
+              direction="row"
+              title={<text fg={tab.restartPrompt === 'restore' ? ink : t.textMuted}>Restore</text>}
+              onClick={restartFromPrompt}
+            />
+            <ListItem
+              active={tab.restartPrompt === 'close'}
+              direction="row"
+              title={<text fg={tab.restartPrompt === 'close' ? ink : t.textMuted}>Close</text>}
+              onClick={closeFromPrompt}
+            />
+          </box>
+        </ModalShell>
+      ) : null}
+      {!restartPromptOpen &&
+      (tab?.status === 'disconnected' || (tab?.errorMessage != null && tab.errorMessage !== '')) ? (
         // Absolutely positioned so it overlays the bordered box instead of
         // consuming a flex row. If it took a row, the rendered terminal area
         // would be one line shorter than the size sent to the PTY/xterm,

@@ -1,4 +1,5 @@
 import type { ModeId } from '@brimveyn/aimux-config'
+import type { MouseEvent as OtuiMouseEvent } from '@opentui/core'
 import type { ReactNode } from 'react'
 
 import { useTheme } from '../../../theme'
@@ -10,6 +11,8 @@ interface ModalShellProps {
   listGap?: number
   subtitle?: string
   keybindsModeId?: ModeId
+  /** Clicks around the card — for a shell drawn over something still clickable. */
+  onBackdropMouseDown?: (event: OtuiMouseEvent) => void
   title: string
   width: number | `${number}%`
 }
@@ -19,6 +22,7 @@ export function ModalShell({
   footer,
   keybindsModeId,
   listGap = 1,
+  onBackdropMouseDown,
   subtitle,
   title,
   width,
@@ -33,6 +37,7 @@ export function ModalShell({
       height="100%"
       justifyContent="center"
       alignItems="center"
+      onMouseDown={onBackdropMouseDown}
     >
       {/* No frame, like everything else — the panel background is what lifts the
           modal off the terminal, and the extra column either side is what makes
