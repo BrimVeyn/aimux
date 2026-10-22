@@ -1,5 +1,6 @@
 import type { MouseEvent as OtuiMouseEvent, ScrollBoxRenderable } from '@opentui/core'
 
+import { useRenderer } from '@opentui/react'
 import {
   forwardRef,
   useCallback,
@@ -97,6 +98,7 @@ export const StackedView = forwardRef<StackedViewHandle, Props>(function Stacked
   },
   ref
 ) {
+  const renderer = useRenderer()
   const scrollRef = useRef<ScrollBoxRenderable | null>(null)
   const measuredHeightsRef = useRef<Record<string, number>>({})
   const handleScroll = useWheel()
@@ -114,15 +116,15 @@ export const StackedView = forwardRef<StackedViewHandle, Props>(function Stacked
   )
 
   useEffect(() => {
-    cancelAnimationFrame(commitFrameRef.current)
+    renderer.cancelAnimationFrame(commitFrameRef.current)
     if (Object.keys(measuredHeightsRef.current).length === 0) return
     measuredHeightsRef.current = {}
     setMeasurementVersion((version) => version + 1)
-  }, [width, file])
+  }, [file, renderer, width])
 
   useEffect(() => {
-    return () => cancelAnimationFrame(commitFrameRef.current)
-  }, [])
+    return () => renderer.cancelAnimationFrame(commitFrameRef.current)
+  }, [renderer])
 
   const estimateHeight = useCallback(
     (segment: DiffSegment) =>
@@ -167,11 +169,11 @@ export const StackedView = forwardRef<StackedViewHandle, Props>(function Stacked
     }
     if (!changed) return
     measuredHeightsRef.current = next
-    cancelAnimationFrame(commitFrameRef.current)
-    commitFrameRef.current = requestAnimationFrame(() => {
+    renderer.cancelAnimationFrame(commitFrameRef.current)
+    commitFrameRef.current = renderer.requestAnimationFrame(() => {
       setMeasurementVersion((version) => version + 1)
     })
-  }, [renderedSegments])
+  }, [renderedSegments, renderer])
 
   const gw = useMemo(() => gutterWidth(file), [file])
 

@@ -1,6 +1,7 @@
 import type { MouseEvent as OtuiMouseEvent, ScrollBoxRenderable } from '@opentui/core'
 import type { ThemedToken } from 'shiki'
 
+import { useRenderer } from '@opentui/react'
 import {
   forwardRef,
   useCallback,
@@ -96,6 +97,7 @@ export const SplitView = forwardRef<SplitViewHandle, Props>(function SplitView(
   { file, foldDispatch, highlights, onMeasure, requestSegmentHighlights, segments, widths },
   ref
 ) {
+  const renderer = useRenderer()
   const t = useTheme()
   const separatorBg = t.background
   const leftRef = useRef<ScrollBoxRenderable | null>(null)
@@ -119,15 +121,15 @@ export const SplitView = forwardRef<SplitViewHandle, Props>(function SplitView(
   )
 
   useEffect(() => {
-    cancelAnimationFrame(commitFrameRef.current)
+    renderer.cancelAnimationFrame(commitFrameRef.current)
     if (Object.keys(measuredHeightsRef.current).length === 0) return
     measuredHeightsRef.current = {}
     setMeasurementVersion((version) => version + 1)
-  }, [widths, file])
+  }, [file, renderer, widths])
 
   useEffect(() => {
-    return () => cancelAnimationFrame(commitFrameRef.current)
-  }, [])
+    return () => renderer.cancelAnimationFrame(commitFrameRef.current)
+  }, [renderer])
 
   const estimateHeight = useCallback(
     (segment: DiffSegment) =>
@@ -169,11 +171,11 @@ export const SplitView = forwardRef<SplitViewHandle, Props>(function SplitView(
     }
     if (!changed) return
     measuredHeightsRef.current = next
-    cancelAnimationFrame(commitFrameRef.current)
-    commitFrameRef.current = requestAnimationFrame(() => {
+    renderer.cancelAnimationFrame(commitFrameRef.current)
+    commitFrameRef.current = renderer.requestAnimationFrame(() => {
       setMeasurementVersion((version) => version + 1)
     })
-  }, [renderedSegments])
+  }, [renderedSegments, renderer])
 
   const gw = useMemo(() => gutterWidth(file), [file])
 

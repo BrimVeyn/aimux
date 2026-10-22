@@ -52,6 +52,8 @@ function getSummaryLine(failedChecks: DoctorCheck[]): string {
   return `${failedChecks.length} check(s) need attention before aimux will work reliably.`
 }
 
+const MIN_BUN = '>=1.3.14'
+
 export function buildDoctorReport(): DoctorReport {
   const configResult = loadConfigResult()
   const config = configResult.config
@@ -63,10 +65,12 @@ export function buildDoctorReport(): DoctorReport {
     ok: process.platform === 'darwin' || process.platform === 'linux',
   })
 
+  // opentui 0.6 refuses older runtimes; keep in step with `engines.bun`.
+  const bunOk = Bun.semver.satisfies(Bun.version, MIN_BUN)
   checks.push({
-    details: Bun.version,
+    details: bunOk ? Bun.version : `${Bun.version} (needs ${MIN_BUN})`,
     name: 'bun',
-    ok: typeof Bun.version === 'string' && Bun.version.length > 0,
+    ok: bunOk,
   })
 
   checks.push({

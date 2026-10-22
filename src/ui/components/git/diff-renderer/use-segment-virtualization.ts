@@ -1,5 +1,6 @@
 import type { ScrollBoxRenderable } from '@opentui/core'
 
+import { useRenderer } from '@opentui/react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 
 import type { DiffSegment } from './build-rows'
@@ -35,6 +36,7 @@ export function useSegmentVirtualization<T extends DiffSegment>({
   segments,
   version,
 }: Options<T>): VirtualizedSegment<T> {
+  const renderer = useRenderer()
   const [viewport, setViewport] = useState<ViewportState>({ height: 0, scrollTop: 0 })
   const estimateHeightRef = useRef(estimateHeight)
 
@@ -51,11 +53,11 @@ export function useSegmentVirtualization<T extends DiffSegment>({
         scrollTop: Math.max(0, node?.scrollTop ?? 0),
       }
       setViewport((prev) => (sameViewport(prev, next) ? prev : next))
-      frame = requestAnimationFrame(tick)
+      frame = renderer.requestAnimationFrame(tick)
     }
-    frame = requestAnimationFrame(tick)
-    return () => cancelAnimationFrame(frame)
-  }, [scrollRef])
+    frame = renderer.requestAnimationFrame(tick)
+    return () => renderer.cancelAnimationFrame(frame)
+  }, [renderer, scrollRef])
 
   return useMemo(() => {
     void version
