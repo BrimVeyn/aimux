@@ -551,39 +551,28 @@ export function TerminalPane({
         onMouseUp={forwardMouseEvent}
       >
         {!tab ? (
+          // Keep this at a fixed row count: adding a line shifts everything
+          // under a centred column, and the vacated cells are not repainted —
+          // the old text bleeds through the new spaces. The Ctrl+n key is in
+          // the status bar already, so the button is the only call to action.
           <box flexGrow={1} justifyContent="center" alignItems="center" flexDirection="column">
-            <text fg={t.textMuted}>· · ·</text>
-            <text fg={t.textMuted}> </text>
-            {emptyProjectName !== '' ? (
-              <box flexDirection="row">
-                <text fg={t.text}>{emptyProjectName}</text>
-                {emptyWorkspaceName !== '' && emptyWorkspaceName !== emptyProjectName ? (
-                  <>
-                    <text fg={t.textMuted}> / </text>
-                    <text fg={t.text}>{emptyWorkspaceName}</text>
-                  </>
-                ) : null}
-              </box>
-            ) : null}
-            <text fg={t.textMuted}>has no tabs</text>
-            <text fg={t.textMuted}> </text>
-            {/* Keep this at a fixed row count: adding a line shifts everything
-                under a centred column, and the vacated cells are not repainted
-                — the old text bleeds through the new spaces. */}
-            <box flexDirection="row">
-              <text fg={t.textMuted}>Press </text>
-              <text fg={t.primary}>Ctrl+n</text>
-              <text fg={t.textMuted}> to launch an assistant</text>
-            </box>
+            <text fg={t.text}>
+              {emptyProjectName}
+              {emptyWorkspaceName !== '' && emptyWorkspaceName !== emptyProjectName ? (
+                <>
+                  <span fg={t.textMuted}> / </span>
+                  {emptyWorkspaceName}
+                </>
+              ) : null}
+            </text>
+            <text fg={t.textMuted}>No tabs</text>
             <box
-              flexDirection="row"
-              justifyContent="center"
               marginTop={1}
               paddingX={2}
-              backgroundColor={t.backgroundPanel}
+              backgroundColor={t.primary}
               onMouseDown={handleNoTabMouseDown}
             >
-              <text fg={t.text}>New assistant</text>
+              <text fg={ink}>New assistant</text>
             </box>
           </box>
         ) : (
