@@ -38,6 +38,6 @@
     "access": "public"
   },
   "dependencies": {
-    "shiki": "^4.0.2"
+    "shiki": "^4.5.0"
   }
 }

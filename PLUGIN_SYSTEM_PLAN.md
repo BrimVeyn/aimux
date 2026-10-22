@@ -261,8 +261,8 @@ conditionne la stabilité de l'API.
   `{ type: 'plugin-effect', … }`. Les unions restent fermées,
   `switch-exhaustiveness-check` reste satisfait.
 - `ModeId` : `BuiltinModeId | \`plugin.${string}\``. `transitions.ts`obtient
-une règle par défaut pour les modes plugin (vers/depuis`navigation`, plus ce
-que le plugin déclare). `bridge.ts`gagne un point d'extension`deriveModeId`. `HELP_MODE_LABELS` lit le registre.
+  une règle par défaut pour les modes plugin (vers/depuis`navigation`, plus ce
+  que le plugin déclare). `bridge.ts`gagne un point d'extension`deriveModeId`. `HELP_MODE_LABELS` lit le registre.
 - `FocusMode` : une valeur `plugin-view` avec `activePluginView: string` dans
   l'état.
 - `ModalState` : une variante `plugin-modal`.
@@ -370,7 +370,7 @@ chaud, listé et journalisé par le CLI. Aucun registre ouvert encore.
 7. Config : `plugins` dans `AimuxUserConfig` et le resolver ;
    `aimux-plugins.json` avec validation par champ comme `loadConfigResult`.
 8. CLI : `aimux plugin list | link | unlink | install <owner/repo[/subdir]> |
-uninstall | enable | disable | reload | log | doctor`. `install` = clone +
+   uninstall | enable | disable | reload | log | doctor`. `install` = clone +
    prévisualisation du manifeste + `build` après confirmation, comme herdr.
 9. Tests : unitaires kernel (cycle de vie, disposers, inject en attente, HMR
    sans fuite), intégration loader avec un plugin fixture dans
@@ -569,7 +569,7 @@ Les quatre exemples ont buté sur ceci, par ordre décroissant de gêne.
    `tab-state` et `raw-input-handler`. **Le prochain morceau à faire.**
 2. **Un plugin ne peut pas naviguer aimux.** Ouvrir le mode git, l'écran
    stats, une modale native : rien. Un `ctx.ui.navigate('git' | 'stats' |
-'settings')` étroit couvrirait le besoin réel sans exposer les ids de
+   'settings')` étroit couvrirait le besoin réel sans exposer les ids de
    modales — qui deviendraient de l'API le jour où on les expose.
 3. **Un widget ne connaît que sa largeur.** La hauteur est devinée. Passer
    `{ cols, rows }` à `render` plutôt qu'un nombre.
@@ -742,9 +742,7 @@ eux périmés sans que rien ne puisse le détecter.
 
 ```jsonc
 {
-  "plugins": [
-    /* inchangé : où est le code — link/install */
-  ],
+  "plugins": [/* inchangé : où est le code — link/install */],
   "overrides": { "aimux.claude": { "enabled": false } },
 }
 ```

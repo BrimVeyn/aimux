@@ -131,11 +131,11 @@ function buildTreeRows(
       files: sectionFiles,
       rows:
         fileListMode === 'flat'
-          ? sectionFiles.map((file) => ({
+          ? sectionFiles.map((file): GitTreeRow => ({
               depth: 0,
               file,
               key: gitFileKey(file),
-              kind: 'file' as const,
+              kind: 'file',
               section,
             }))
           : flattenSectionRows(sectionFiles, collapsedFolders, compact),

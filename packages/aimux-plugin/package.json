@@ -35,7 +35,7 @@
     "access": "public"
   },
   "devDependencies": {
-    "@types/react": "^19.2.14"
+    "@types/react": "^19.3.0"
   },
   "peerDependencies": {
     "@opentui/core": ">=0.6.6",

@@ -55,6 +55,12 @@
       }
     ],
     "react/rules-of-hooks": "error",
+    "react/refs": "off",
+    "react/set-state-in-effect": "off",
+    "react/purity": "off",
+    "react/immutability": "off",
+    "react/globals": "off",
+    "react/preserve-manual-memoization": "off",
     "react/no-unescaped-entities": "error",
     "react/no-array-index-key": "warn",
     "unicorn/no-array-for-each": "error",

@@ -121,8 +121,8 @@ export function setPluginUserConfig(
  * Built-ins only: hydration runs once at boot, before any plugin has loaded,
  * and a plugin's settings are hydrated by its own fiber from its own config.
  */
-export const ALL_SETTING_ROWS: readonly SettingRow[] = BUILTIN_SETTING_SECTIONS.flatMap((section) =>
-  Array.isArray(section.rows) ? section.rows : []
+export const ALL_SETTING_ROWS: readonly SettingRow[] = BUILTIN_SETTING_SECTIONS.flatMap(
+  (section) => (Array.isArray(section.rows) ? section.rows : [])
 )
 
 export function getSection(sectionId: string): SettingSection | undefined {

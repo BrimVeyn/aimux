@@ -1,1 +1,1 @@
-export { type DiffView, PierreDiff, type PierreDiffHandle } from './pierre-diff'
+export { PierreDiff, type PierreDiffHandle } from './pierre-diff'
