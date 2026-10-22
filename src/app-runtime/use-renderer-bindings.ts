@@ -21,14 +21,7 @@ import {
   type TriggerDetector,
   type TriggerMatch,
 } from '../snippets/trigger-detector'
-import { shouldSuppressSelectionCopy } from './multi-click-clipboard-guard'
 import { writeMacroExpansionToTab, writePasteToTab, writeToTab } from './pty-write'
-import { type OtuiSelection, resolveSelectionClipboardText } from './selection-clipboard'
-import {
-  resetSelectionClipboardDedup,
-  shouldWriteSelectionToClipboard,
-} from './selection-clipboard-dedup'
-import { applyViewportObservation, type ViewportObservation } from './selection-scroll'
 
 const BRACKETED_PASTE_ENABLE_SEQUENCE = '\x1b[?2004h'
 const BRACKETED_PASTE_DISABLE_SEQUENCE = '\x1b[?2004l'
@@ -41,7 +34,6 @@ interface UseRendererBindingsOptions {
   dispatch: (action: AppAction) => void
   focusMode: FocusMode
   activeTabId: string | null
-  activeTabViewportY: number | null
   focusModeRef: MutableRefObject<FocusMode>
   activeTabIdRef: MutableRefObject<string | null>
   activeTabRef: MutableRefObject<TabSession | undefined>
@@ -59,7 +51,6 @@ export function useRendererBindings({
   activeTabId,
   activeTabIdRef,
   activeTabRef,
-  activeTabViewportY,
   backend,
   branchRef,
   dispatch,
@@ -70,7 +61,6 @@ export function useRendererBindings({
   snippetsRef,
   triggerCharRef,
 }: UseRendererBindingsOptions): void {
-  const lastViewportRef = useRef<ViewportObservation | null>(null)
   const triggerDetectorsRef = useRef<Map<string, TriggerDetector>>(new Map())
   const pendingMacroUndoRef = useRef<Map<string, { fullLength: number; suffixLength: number }>>(
     new Map()
@@ -233,46 +223,13 @@ export function useRendererBindings({
       writePasteToTab(backend, tabId, tab, payload)
     }
 
-    const handleSelection = (selection: OtuiSelection) => {
-      const { fallbackLength, selectedText, streamLength } = resolveSelectionClipboardText(
-        selection,
-        activeTabRef.current
-      )
-
-      logInputDebug('app.selection', {
-        fallbackLength,
-        isDragging: selection.isDragging ?? false,
-        osc52Supported: renderer.isOsc52Supported(),
-        streamLength,
-        textLength: selectedText.length,
-      })
-
-      if (selection.isDragging === true) {
-        return
-      }
-      if (selectedText.length === 0) {
-        // Deselect → forget the last-written text so a deliberate reselection
-        // of the same text writes it again.
-        resetSelectionClipboardDedup()
-        return
-      }
-
-      // After a multi-click drag, handleTerminalMouseUp has just copied the
-      // authoritative text built from drag.capturedLines (anchored at click
-      // time). opentui's finishSelection() then re-fires this 'selection'
-      // event, but the recomputed text can drift by a few rows when output
-      // landed between mouseDown and mouseUp. Skip the redundant write.
-      if (shouldSuppressSelectionCopy()) {
-        logInputDebug('app.selection.suppressed', { textLength: selectedText.length })
-        return
-      }
-
-      renderer.copyToClipboardOSC52(selectedText)
-      if (shouldWriteSelectionToClipboard(selectedText)) {
-        copyToSystemClipboard(selectedText)
-      } else {
-        logInputDebug('app.selection.dedup', { textLength: selectedText.length })
-      }
+    // Text opentui selects itself (diffs, modals) copies on release. The
+    // terminal panes draw and copy their own selection: use-mouse-handlers.
+    const handleSelection = (selection: { getSelectedText(): string }) => {
+      const text = selection.getSelectedText()
+      if (text.length === 0) return
+      renderer.copyToClipboardOSC52(text)
+      copyToSystemClipboard(text)
     }
 
     renderer.prependInputHandler(handler)
@@ -296,14 +253,6 @@ export function useRendererBindings({
     snippetsRef,
     triggerCharRef,
   ])
-
-  useEffect(() => {
-    const next: ViewportObservation | null =
-      activeTabId !== null && activeTabViewportY !== null
-        ? { tabId: activeTabId, y: activeTabViewportY }
-        : null
-    lastViewportRef.current = applyViewportObservation(renderer, lastViewportRef.current, next)
-  }, [activeTabId, activeTabViewportY, renderer])
 
   useEffect(() => {
     const shouldEnableBracketedPaste = focusMode === 'terminal-input' && activeTabId !== null

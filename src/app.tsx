@@ -436,7 +436,6 @@ export function App({
     activeTabId: state.activeTabId,
     activeTabIdRef,
     activeTabRef,
-    activeTabViewportY: activeTab?.viewport?.viewportY ?? null,
     backend,
     branchRef,
     dispatch,

@@ -264,4 +264,16 @@ describe('snapshotTerminal', () => {
     expect(cursorSpan?.text).toBe(' ')
     terminal.dispose()
   })
+
+  test('flags the rows a long line soft-wrapped into', async () => {
+    const terminal = new Terminal({ allowProposedApi: true, cols: 10, rows: 4 })
+
+    await new Promise<void>((resolve) => {
+      terminal.write('echo hello world\r\nnext', resolve)
+    })
+
+    const { lines } = snapshotTerminal(terminal)
+    expect(lines.map((line) => line.wrapped === true)).toEqual([false, true, false, false])
+    terminal.dispose()
+  })
 })

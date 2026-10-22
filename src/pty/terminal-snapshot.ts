@@ -183,7 +183,7 @@ function buildLine(
     }
   }
 
-  return { spans }
+  return line.isWrapped ? { spans, wrapped: true } : { spans }
 }
 
 export interface SnapshotCursorOptions {
@@ -263,7 +263,7 @@ function areSpansEqual(left: TerminalSpan, right: TerminalSpan): boolean {
 }
 
 function areLinesEqual(left: TerminalLine, right: TerminalLine): boolean {
-  if (left.spans.length !== right.spans.length) {
+  if (left.spans.length !== right.spans.length || left.wrapped !== right.wrapped) {
     return false
   }
 
