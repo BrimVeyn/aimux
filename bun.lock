@@ -34,14 +34,14 @@
       "name": "@brimveyn/aimux-config",
       "version": "0.11.14",
       "dependencies": {
-        "shiki": "^4.0.2",
+        "shiki": "^4.5.0",
       },
     },
     "packages/aimux-plugin": {
       "name": "@brimveyn/aimux-plugin",
       "version": "0.1.7",
       "devDependencies": {
-        "@types/react": "^19.2.14",
+        "@types/react": "^19.3.0",
       },
       "peerDependencies": {
         "@opentui/core": ">=0.6.6",
