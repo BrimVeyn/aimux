@@ -3,7 +3,7 @@ import type { ProjectRecord, WorkspaceRecord } from '../state/types'
 import { logDebug } from '../debug/input-log'
 import { createPrefixedId } from '../platform/id'
 import { loadProjectCatalog, saveProjectCatalog } from '../state/project-catalog'
-import { createEmptyProjectSnapshot } from '../state/project-persistence'
+import { createEmptyProjectSnapshot, pruneSnapshotOfWorkspace } from '../state/project-persistence'
 import { createPrimaryWorkspace, ensureProjectWorkspaces } from '../state/project-workspaces'
 
 /**
@@ -113,6 +113,7 @@ export function removeWorkspaceFromCatalog(projectId: string, workspaceId: strin
       ? {
           ...s,
           activeWorkspaceId: s.activeWorkspaceId === workspaceId ? undefined : s.activeWorkspaceId,
+          projectSnapshot: pruneSnapshotOfWorkspace(s.projectSnapshot, workspaceId),
           updatedAt: new Date().toISOString(),
           workspaces: nextWorkspaces,
         }

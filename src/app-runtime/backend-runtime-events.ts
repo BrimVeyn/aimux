@@ -15,6 +15,7 @@ import { logInputDebug } from '../debug/input-log'
 import { clearTabSyntaxState, highlightSnapshot } from '../integrations/claude-syntax-overlay'
 import { appStore } from '../state/app-store'
 import { loadProjectCatalog, saveProjectCatalog } from '../state/project-catalog'
+import { pruneSnapshotOfWorkspace } from '../state/project-persistence'
 import { recordCommandPaneExit } from '../ui/plugin-command-panes'
 import {
   handleCreateProjectEffect,
@@ -235,6 +236,13 @@ export function bindBackendRuntimeEvents({
       return
     }
     logInputDebug('app.backend.event.workspaceRemoved', { projectId, workspaceId })
+    // The daemon already closed these PTYs; a close sends no exit event, so
+    // drop the tabs here or they linger on a workspace that no longer exists.
+    for (const tab of current.tabs.filter((entry) => entry.workspaceId === workspaceId)) {
+      clearTabRuntimeState(timeouts, tab.id)
+      clearTabSyntaxState(tab.id)
+      dispatch({ tabId: tab.id, type: 'close-tab' })
+    }
     // Build the updated projects list and dispatch via `set-projects` — this
     // matches the pattern used by the existing workspace-delete side-effect
     // and centralises the write in one action rather than adding a new one.
@@ -245,6 +253,7 @@ export function bindBackendRuntimeEvents({
         ...s,
         activeWorkspaceId:
           s.activeWorkspaceId === workspaceId ? remaining[0]?.id : s.activeWorkspaceId,
+        projectSnapshot: pruneSnapshotOfWorkspace(s.projectSnapshot, workspaceId),
         updatedAt: new Date().toISOString(),
         workspaces: remaining,
       }

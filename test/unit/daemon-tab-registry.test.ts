@@ -5,6 +5,7 @@ import type { TerminalLine, TerminalSnapshot } from '../../src/state/types'
 import {
   type DaemonTabEntry,
   findWorkerNameConflict,
+  findWorkspaceTabs,
   mergeTabRegistryEntry,
 } from '../../src/daemon/daemon'
 
@@ -149,5 +150,26 @@ describe('findWorkerNameConflict', () => {
     expect(findWorkerNameConflict(registry, 'project-a', 'api')).toBe('tab-a')
     expect(findWorkerNameConflict(registry, 'project-b', 'api')).toBe('tab-b')
     expect(findWorkerNameConflict(registry, 'project-a', 'web')).toBeUndefined()
+  })
+})
+
+describe('findWorkspaceTabs', () => {
+  test('returns only the tabs of that workspace in that project', () => {
+    const entry = (projectId: string, workspaceId?: string): DaemonTabEntry => ({
+      assistant: 'claude',
+      command: 'claude',
+      projectId,
+      viewport: undefined,
+      viewportSeq: 0,
+      workspaceId,
+    })
+    const registry = new Map<string, DaemonTabEntry>([
+      ['a', entry('P', 'W')],
+      ['b', entry('P', 'other')],
+      ['c', entry('Q', 'W')],
+      ['d', entry('P')],
+      ['e', entry('P', 'W')],
+    ])
+    expect(findWorkspaceTabs(registry, 'P', 'W')).toEqual(['a', 'e'])
   })
 })
