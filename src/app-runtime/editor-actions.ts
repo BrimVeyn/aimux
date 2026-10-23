@@ -170,8 +170,9 @@ function spawnDetached(ctx: SideEffectContext, argv: string[], cwd?: string): vo
 
 /**
  * Suspend the opentui renderer, hand the TTY to the editor (inheriting
- * stdin/stdout/stderr), then resume and force a redraw on exit. Matches the
- * shellout pattern used by opencode (packages/opencode/src/cli/cmd/tui/util/editor.ts).
+ * stdin/stdout/stderr), then resume on exit. resume() repaints the whole
+ * screen itself; the buffers must not be touched in between, opentui only
+ * allows drawing inside a frame.
  */
 async function openEditorInline(
   ctx: SideEffectContext,
@@ -182,7 +183,6 @@ async function openEditorInline(
   const { renderer } = ctx
   try {
     await renderer.suspend()
-    renderer.currentRenderBuffer.clear()
     const proc = Bun.spawn([executable, ...args], {
       cwd,
       stderr: 'inherit',
@@ -194,8 +194,6 @@ async function openEditorInline(
     const msg = error instanceof Error ? error.message : 'failed to spawn editor'
     ctx.dispatch({ message: `editor: ${msg}`, type: 'git-mode-set-message' })
   } finally {
-    renderer.currentRenderBuffer.clear()
     await renderer.resume()
-    renderer.requestRender()
   }
 }
