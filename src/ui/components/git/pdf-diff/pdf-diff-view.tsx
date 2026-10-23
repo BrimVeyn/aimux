@@ -11,9 +11,13 @@ import { detectGraphicsProtocol } from '../../../terminal-graphics/capabilities'
 import { formatBytes } from '../../../terminal-graphics/dimensions'
 import {
   changedPages,
+  changedPagesSoFar,
+  type FingerprintProgress,
+  pdfDocumentKey,
   pdfPageCount,
-  pdfPageFingerprints,
+  pdfTextFingerprints,
   renderPdfPage,
+  watchPdfPageFingerprints,
 } from '../../../terminal-graphics/pdf-render'
 import { useTheme } from '../../../theme'
 import { graphicsBanner, TerminalImagePane } from '../image-diff'
@@ -32,6 +36,12 @@ interface PdfDiffViewProps {
 interface Counts {
   after: number
   before: number
+}
+
+/** The pages known to differ, and whether every pass looking for more is over. */
+interface Changes {
+  done: boolean
+  pages: readonly number[]
 }
 
 type Render =
@@ -57,15 +67,18 @@ function formatPages(pages: readonly number[]): string {
   return runs.join(', ')
 }
 
-function changeSummary(changed: readonly number[] | null, page: number): string {
-  if (changed === null) return 'comparing pages…'
+function changeSummary(changes: Changes | null, page: number): string {
+  if (changes === null || (changes.pages.length === 0 && !changes.done)) return 'comparing pages…'
+  const changed = changes.pages
   if (changed.length === 0) return 'no visual changes'
-  const here = changed.includes(page) ? 'changed' : 'unchanged'
   const list =
     changed.length > MAX_LISTED_PAGES
       ? `${changed.length} pages changed`
       : `changed: ${formatPages(changed)}`
-  return `${here} · ${list}`
+  // Still comparing, a page not on the list yet may be on it in a moment, so it
+  // is not called unchanged until the end.
+  if (!changes.done) return `${changed.includes(page) ? 'changed · ' : ''}${list} · comparing…`
+  return `${changed.includes(page) ? 'changed' : 'unchanged'} · ${list}`
 }
 
 // Every scroll key turns exactly one page, changed or not: the whole document stays
@@ -85,19 +98,21 @@ interface PageProps {
 const PdfPage = memo(function PdfPage({ bytes, count, label, page, preview }: PageProps) {
   const t = useTheme()
   const [render, setRender] = useState<Render>({ kind: 'loading' })
-  const exists = bytes !== undefined && count !== null && page <= count
+  // Rendered before the page count is in: page 1 is on screen sooner, and a page
+  // past the end only fails a render the count then explains.
+  const exists = bytes !== undefined && (count === null || page <= count)
 
   useEffect(() => {
     if (!preview || !exists) return
-    let cancelled = false
+    const controller = new AbortController()
     setRender({ kind: 'loading' })
     void (async () => {
-      const result = await renderPdfPage(bytes, page, RENDER_DPI)
-      if (!cancelled) setRender(result)
+      const result = await renderPdfPage(bytes, page, RENDER_DPI, controller.signal)
+      if (!controller.signal.aborted) setRender(result)
     })()
-    return () => {
-      cancelled = true
-    }
+    // Turned past before it rendered: the render is killed unless another view
+    // is waiting on the same page.
+    return () => controller.abort()
   }, [bytes, exists, page, preview])
 
   const meta = bytes
@@ -109,7 +124,7 @@ const PdfPage = memo(function PdfPage({ bytes, count, label, page, preview }: Pa
   let notice: React.ReactNode = null
   if (!bytes) notice = <text fg={t.textMuted}>(absent)</text>
   else if (count !== null && !exists) notice = <text fg={t.textMuted}>(no page {page})</text>
-  else if (count !== null && !preview) notice = <text fg={t.textMuted}>(no preview)</text>
+  else if (!preview) notice = <text fg={t.textMuted}>(no preview)</text>
   else if (render.kind === 'error') notice = <text fg={t.warning}>({render.reason})</text>
 
   return (
@@ -127,48 +142,132 @@ const PdfPage = memo(function PdfPage({ bytes, count, label, page, preview }: Pa
   )
 })
 
+type Side = 'after' | 'before'
+
+/**
+ * Looks for the pages that changed and reports them as it goes, with two passes
+ * side by side: the text of every page, which takes a moment even on a long
+ * book, and the pixels, which catch what text cannot — an image, a colour, a
+ * moved line — and stream in page by page. A page is changed when either pass
+ * says so. Everything still running is killed when the view goes away.
+ */
+function compareDocuments(
+  before: Uint8Array | undefined,
+  after: Uint8Array | undefined,
+  // The page already on screen. Its render is what the user is waiting for, so
+  // nothing competes with it.
+  visible: Promise<unknown>,
+  signal: AbortSignal,
+  report: (changes: Changes) => void
+): void {
+  let text: number[] = []
+  let textDone = false
+  let raster: number[] = []
+  let rasterDone = false
+  const publish = (): void => {
+    const pages = [...new Set([...text, ...raster])].toSorted((a, b) => a - b)
+    report({ done: textDone && rasterDone, pages })
+  }
+
+  void (async () => {
+    await visible
+    if (signal.aborted) return
+
+    // A side that is absent has no pages to compare: every page on the other is new.
+    const sides: Record<Side, FingerprintProgress> = {
+      after: { done: !after, hashes: [] },
+      before: { done: !before, hashes: [] },
+    }
+    const update = (side: Side, progress: FingerprintProgress): void => {
+      sides[side] = progress
+      const b = sides.before
+      const a = sides.after
+      rasterDone = b.done && a.done
+      if (b.hashes !== null && a.hashes !== null) {
+        raster = changedPagesSoFar(
+          { done: b.done, hashes: b.hashes },
+          { done: a.done, hashes: a.hashes }
+        )
+      }
+      publish()
+    }
+    const stops = [
+      before ? watchPdfPageFingerprints(before, (p) => update('before', p)) : null,
+      after ? watchPdfPageFingerprints(after, (p) => update('after', p)) : null,
+    ]
+    signal.addEventListener('abort', () => {
+      for (const stop of stops) stop?.()
+    })
+
+    const [tb, ta] = await Promise.all([
+      before ? pdfTextFingerprints(before, signal) : [],
+      after ? pdfTextFingerprints(after, signal) : [],
+    ])
+    if (signal.aborted) return
+    // Unreadable text leaves the pixels to decide alone.
+    if (tb !== null && ta !== null) text = changedPages(tb, ta)
+    textDone = true
+    publish()
+  })()
+}
+
+/**
+ * Keyed on the documents' content: the same PDFs fetched again keep the page the
+ * user is on, and different ones start from nothing instead of inheriting the
+ * last document's page count, page and changes for a frame.
+ */
 export const PdfDiffView = memo(function PdfDiffView({ diff, single = false }: PdfDiffViewProps) {
+  const before = diff.pdfBytesBefore
+  const after = diff.pdfBytesAfter
+  const key = `${before ? pdfDocumentKey(before) : '-'}:${after ? pdfDocumentKey(after) : '-'}`
+  return <PdfDiff key={key} diff={diff} single={single} />
+})
+
+const PdfDiff = memo(function PdfDiff({ diff, single = false }: PdfDiffViewProps) {
   const t = useTheme()
   const renderer = useRenderer()
   const protocol = detectGraphicsProtocol(renderer)
+  const preview = protocol === 'kitty'
   const before = diff.pdfBytesBefore
   const after = diff.pdfBytesAfter
 
   const [counts, setCounts] = useState<Counts | null>(null)
-  const [changed, setChanged] = useState<number[] | null>(null)
+  const [changes, setChanges] = useState<Changes | null>(null)
   const [page, setPage] = useState(1)
   const navigatedRef = useRef(false)
 
   useEffect(() => {
     let cancelled = false
-    setCounts(null)
-    setChanged(null)
-    setPage(1)
-    navigatedRef.current = false
     void (async () => {
       const [b, a] = await Promise.all([
         before ? pdfPageCount(before) : 0,
         after ? pdfPageCount(after) : 0,
       ])
-      if (cancelled) return
-      setCounts({ after: a, before: b })
-      if (single) return
-      // A side that is absent has no pages to compare: every page on the other is new.
-      const [fb, fa] = await Promise.all([
-        before ? pdfPageFingerprints(before) : [],
-        after ? pdfPageFingerprints(after) : [],
-      ])
-      if (cancelled || fb === null || fa === null) return
-      const pages = changedPages(fb, fa)
-      setChanged(pages)
-      // Open on the first page that changed, unless the user has already moved.
-      const first = pages[0]
-      if (!navigatedRef.current && first !== undefined) setPage(first)
+      if (!cancelled) setCounts({ after: a, before: b })
     })()
     return () => {
       cancelled = true
     }
-  }, [before, after, single])
+  }, [before, after])
+
+  useEffect(() => {
+    if (single) return
+    const controller = new AbortController()
+    const visible = preview
+      ? Promise.all([
+          before ? renderPdfPage(before, 1, RENDER_DPI, controller.signal) : null,
+          after ? renderPdfPage(after, 1, RENDER_DPI, controller.signal) : null,
+        ])
+      : Promise.resolve()
+    compareDocuments(before, after, visible, controller.signal, (next) => {
+      if (controller.signal.aborted) return
+      setChanges(next)
+      // Open on the first page known to have changed, unless the user has moved.
+      const first = next.pages[0]
+      if (!navigatedRef.current && first !== undefined) setPage(first)
+    })
+    return () => controller.abort()
+  }, [before, after, preview, single])
 
   const total = Math.max(1, counts?.before ?? 0, counts?.after ?? 0)
 
@@ -199,7 +298,6 @@ export const PdfDiffView = memo(function PdfDiffView({ diff, single = false }: P
   )
 
   const banner = graphicsBanner(protocol, 'PDF')
-  const preview = protocol === 'kitty'
   const showBoth = before && after
 
   return (
@@ -225,7 +323,7 @@ export const PdfDiffView = memo(function PdfDiffView({ diff, single = false }: P
       <box paddingLeft={1} paddingRight={1}>
         <text fg={t.text}>
           page {page} / {total}
-          {single ? null : <span fg={t.textMuted}> · {changeSummary(changed, page)}</span>}
+          {single ? null : <span fg={t.textMuted}> · {changeSummary(changes, page)}</span>}
         </text>
       </box>
       <box flexDirection="row" flexGrow={1}>
