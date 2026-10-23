@@ -103,13 +103,21 @@ if (!Bun.semver.satisfies(Bun.version, engines.bun)) {
   process.exit(1)
 }
 
+// First thing the UI does: an exception that kills it from here on leaves its
+// stack in the profile's state directory instead of on a screen that vanishes.
+const { installCrashRecord } = await import('./app-runtime/crash-record')
+installCrashRecord()
+
 // Sequential ON PURPOSE: @opentui/react evaluates @opentui/core as part of its
 // own module graph. Loading both concurrently races the two evaluations and
 // react's chunk can hit `class X extends TextNodeRenderable` while core is
 // still initializing (ReferenceError: cannot access before initialization).
 // react has to wait on core either way, so this costs nothing.
 const { createCliRenderer } = await import('@opentui/core')
+const { withoutReactPerformanceTrack } = await import('./app-runtime/react-performance-track')
 
+// Everything that can pull in the React reconciler loads inside the helper, so
+// it is evaluated without the development build's performance track.
 const [
   { createRoot },
   { App, applyStartupTheme },
@@ -121,18 +129,20 @@ const [
   { maybeSpawnUsageRollup },
   { startCounters },
   { installUnhandledRejectionHandler },
-] = await Promise.all([
-  import('@opentui/react'),
-  import('./app'),
-  import('./config/loader'),
-  import('./ui/breaking-update-screen'),
-  import('./ui/host-palette'),
-  import('./session-backend/bootstrap'),
-  import('./cli/completion/install'),
-  import('./services/usage-history/store'),
-  import('./services/aimux-counters'),
-  import('./app-runtime/unhandled-rejections'),
-])
+] = await withoutReactPerformanceTrack(async () =>
+  Promise.all([
+    import('@opentui/react'),
+    import('./app'),
+    import('./config/loader'),
+    import('./ui/breaking-update-screen'),
+    import('./ui/host-palette'),
+    import('./session-backend/bootstrap'),
+    import('./cli/completion/install'),
+    import('./services/usage-history/store'),
+    import('./services/aimux-counters'),
+    import('./app-runtime/unhandled-rejections'),
+  ])
+)
 
 // Before the renderer: from here on, stderr belongs to the alternate screen,
 // and Node's default report for a promise nobody awaited is a stack trace
