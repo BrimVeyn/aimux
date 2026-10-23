@@ -12,23 +12,26 @@ function cacheKey(bytes: Uint8Array): string {
   return new Bun.CryptoHasher('sha1').update(bytes).digest('hex')
 }
 
+/**
+ * Pipes `bytes` through `cmd` and returns its stdout. The timeout runs from the
+ * spawn, input included — a child that stops reading its stdin is still killed —
+ * and `signal` kills it as soon as nobody wants the result.
+ */
 export async function tryConverter(
   cmd: string[],
   bytes: Uint8Array,
-  timeoutMs: number
+  timeoutMs: number,
+  signal?: AbortSignal
 ): Promise<Uint8Array | null> {
   try {
     const proc = Bun.spawn(cmd, {
+      signal,
       stderr: 'ignore',
-      stdin: 'pipe',
+      stdin: bytes,
       stdout: 'pipe',
+      timeout: timeoutMs,
     })
-    const writer = proc.stdin
-    void writer.write(bytes)
-    await writer.end()
-    const timer = setTimeout(() => proc.kill(), timeoutMs)
     const [out, code] = await Promise.all([new Response(proc.stdout).bytes(), proc.exited])
-    clearTimeout(timer)
     if (code !== 0 || out.byteLength === 0) return null
     return out
   } catch {

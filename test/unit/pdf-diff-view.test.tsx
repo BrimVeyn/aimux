@@ -40,7 +40,10 @@ describe.skipIf(!hasPoppler)('PdfDiffView', () => {
       width: 100,
     })
     await renderOnce()
-    await settle(renderOnce, () => captureCharFrame().includes('changed: 2, 5'))
+    await settle(renderOnce, () => {
+      const frame = captureCharFrame()
+      return frame.includes('changed: 2, 5') && !frame.includes('comparing')
+    })
 
     expect(captureCharFrame()).toContain('page 2 / 5 · changed · changed: 2, 5')
 
