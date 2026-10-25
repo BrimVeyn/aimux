@@ -497,6 +497,14 @@ export interface GitModeState {
    * `editBuffer` is what the sidebar shows instead.
    */
   fileFilter: string
+  /**
+   * Files marked reviewed, keyed by `gitReviewKey`, each holding the line counts
+   * it had when marked. A file whose counts moved since — the agent touched it
+   * again — reads as not reviewed, with nothing to clear.
+   */
+  reviewed: Record<string, string>
+  /** Leave reviewed files out of the list. */
+  hideReviewed: boolean
 }
 
 interface ModalBase {
@@ -1092,6 +1100,9 @@ export type SideEffect =
     }
   | { type: 'confirm-split' }
   | { type: 'scroll-git-diff'; delta: number }
+  | { type: 'jump-git-hunk'; delta: 1 | -1 }
+  /** The change block at the top of the diff, to the clipboard or into the workspace's agent. */
+  | { type: 'copy-git-hunk'; to: 'clipboard' | 'agent' }
   | { type: 'persist-git-diff-mode-ratio'; ratio: number }
   | { type: 'persist-git-file-list-mode'; mode: GitFileListMode }
   | { type: 'persist-git-tree-compaction'; enabled: boolean }
@@ -1497,6 +1508,8 @@ export type GitModeAction =
   | { type: 'git-mode-toggle-markdown-view' }
   | { type: 'git-mode-markdown-toggle-expand'; key: string }
   | { type: 'git-mode-toggle-review-base' }
+  | { type: 'git-mode-toggle-reviewed' }
+  | { type: 'git-mode-toggle-hide-reviewed' }
   | { type: 'git-mode-shift-head-offset'; delta: number }
   | { type: 'git-mode-set-head-offset'; offset: number }
   | {

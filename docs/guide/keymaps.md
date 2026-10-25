@@ -214,6 +214,9 @@ Enter with `Ctrl+D` from `navigation`. Leading action keys:
 - `p` - push the current branch
 - `v` - toggle split / stacked diff
 - `t` - toggle flat / tree list
+- `x` / `H` - mark the selected file reviewed / hide reviewed files
+- `J` / `K` - next / previous change in the diff
+- `y` / `Y` - copy the change with its location / add it to the agent's prompt
 - `]` / `[` - walk to an older / newer commit baseline (HEAD~N)
 - `?` - help (scoped to git-mode, rendered as an overlay)
 

@@ -8,6 +8,9 @@ import {
   getSelectedGitRow,
   gitFileKey,
   gitModeVisibleFiles,
+  gitReviewKey,
+  gitReviewSignature,
+  hiddenReviewed,
   moveGitFileSelection,
   moveGitSelection,
   reconcileGitSelection,
@@ -53,6 +56,16 @@ function withGitFileFilter(state: AppState, fileFilter: string): AppState {
   })
 }
 
+/** The rows the sidebar shows now, to find a neighbour once some of them leave. */
+function visibleGitKeysOf(state: AppState): string[] {
+  return visibleGitKeys(
+    gitModeVisibleFiles(state),
+    state.gitMode.collapsedFolders,
+    state.gitPane.fileListMode,
+    state.gitPane.treeCompaction
+  )
+}
+
 export function emptyGitMode(): GitModeState {
   return {
     actionMessage: null,
@@ -62,6 +75,7 @@ export function emptyGitMode(): GitModeState {
     fileFilter: '',
     folds: {},
     headOffset: 0,
+    hideReviewed: false,
     highlights: {},
     loading: {},
     markdownExpanded: {},
@@ -69,6 +83,7 @@ export function emptyGitMode(): GitModeState {
     parsedFiles: {},
     pendingDeletePath: null,
     reviewBase: false,
+    reviewed: {},
     selectedEntryKey: null,
   }
 }
@@ -185,6 +200,30 @@ export function reduceGitModeState(state: AppState, action: AppAction): AppState
           selectedEntryKey: next,
         },
       }
+    }
+    case 'git-mode-toggle-reviewed': {
+      const row = getSelectedGitRow(gitModeVisibleFiles(state), {
+        collapsedFolders: state.gitMode.collapsedFolders,
+        compact: state.gitPane.treeCompaction,
+        fileListMode: state.gitPane.fileListMode,
+        selectedEntryKey: state.gitMode.selectedEntryKey,
+      })
+      if (!row || row.kind !== 'file') return state
+      const key = gitReviewKey(row.file)
+      const signature = gitReviewSignature(row.file)
+      const reviewed = { ...state.gitMode.reviewed }
+      if (reviewed[key] === signature) delete reviewed[key]
+      else reviewed[key] = signature
+      return reconcileGitSelection(
+        { ...state, gitMode: { ...state.gitMode, reviewed } },
+        visibleGitKeysOf(state)
+      )
+    }
+    case 'git-mode-toggle-hide-reviewed': {
+      return reconcileGitSelection(
+        { ...state, gitMode: { ...state.gitMode, hideReviewed: !state.gitMode.hideReviewed } },
+        visibleGitKeysOf(state)
+      )
     }
     case 'git-mode-toggle-folder': {
       const row = getSelectedGitRow(gitModeVisibleFiles(state), {
@@ -586,14 +625,14 @@ export function reduceGitModeState(state: AppState, action: AppAction): AppState
           : []
       const filter = activeGitFileFilter(state)
       const nextSelectedEntryKey = reconcileSelectedGitEntryKey(
-        filterGitFiles(nextFiles, filter),
+        filterGitFiles(nextFiles, filter, hiddenReviewed(state)),
         state.gitMode.collapsedFolders,
         state.gitPane.fileListMode,
         currentKey,
         preferredSelection,
         state.gitPane.treeCompaction,
         visibleGitKeys(
-          filterGitFiles(files, filter),
+          filterGitFiles(files, filter, hiddenReviewed(state)),
           state.gitMode.collapsedFolders,
           state.gitPane.fileListMode,
           state.gitPane.treeCompaction

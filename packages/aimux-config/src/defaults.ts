@@ -157,6 +157,12 @@ export function getDefaultKeymapConfig(): ResolvedKeymapConfig {
         .map('<Right>', actions.expandGitSelection, 'Expand folder')
         .map('<Down>', actions.scrollGitDiff(1), 'Scroll down')
         .map('<Up>', actions.scrollGitDiff(-1), 'Scroll up')
+        .map('J', actions.jumpGitHunk(1), 'Next change')
+        .map('K', actions.jumpGitHunk(-1), 'Previous change')
+        .map('y', actions.copyGitHunk, 'Copy change with its location')
+        .map('Y', actions.sendGitHunkToAgent, "Add change to the agent's prompt")
+        .map('x', actions.toggleGitReviewed, 'Mark file reviewed')
+        .map('H', actions.toggleGitHideReviewed, 'Hide reviewed files')
     )
 
     // -----------------------------------------------------------------------

@@ -14,7 +14,8 @@ interface GitFileFilterBarProps {
 
 /**
  * The diff sidebar's file filter. Only drawn while there is one — being typed,
- * or applied — so an unfiltered list spends no row on it; `/` is in the help.
+ * applied, or reviewed files left out — so an unfiltered list spends no row on
+ * it; `/` and `H` are in the help.
  *
  * While typing it is a field with a cursor; once applied it holds the filter
  * as plain text, so a narrowed list never reads as the whole change set.
@@ -26,8 +27,9 @@ export const GitFileFilterBar = memo(function GitFileFilterBar({
   const t = useTheme()
   const modal = useAppStore((s) => s.modal)
   const applied = useAppStore((s) => s.gitMode.fileFilter)
+  const hideReviewed = useAppStore((s) => s.gitMode.hideReviewed)
   const editing = modal.type === 'git-file-filter'
-  if (!editing && applied === '') return null
+  if (!editing && applied === '' && !hideReviewed) return null
 
   return (
     <box
@@ -50,6 +52,11 @@ export const GitFileFilterBar = memo(function GitFileFilterBar({
         ) : (
           <text fg={t.text} selectable={false} wrapMode="none">
             {applied}
+            {hideReviewed ? (
+              <span fg={t.textMuted}>
+                {applied === '' ? 'reviewed hidden' : ' · reviewed hidden'}
+              </span>
+            ) : null}
           </text>
         )}
       </box>

@@ -485,7 +485,7 @@ export function expandUnifiedSegment(
   return rows
 }
 
-function rowHeight(row: SplitRowOrHeader | UnifiedRowOrHeader): number {
+export function rowHeight(row: SplitRowOrHeader | UnifiedRowOrHeader): number {
   if (row.type === 'hunk-header') return 1
   if (row.type === 'row') return row.height
   if (row.type === 'fold') return 1

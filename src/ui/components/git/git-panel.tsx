@@ -15,6 +15,7 @@ import {
   buildGitTreeRows,
   type GitTreeFileRow,
   type GitTreeFolderRow,
+  isGitFileReviewed,
   treeGuides,
 } from '../../../state/git-tree'
 import { fileIcon, folderIcon, type Icon } from '../../file-icons'
@@ -257,6 +258,7 @@ const FileRow = memo(function FileRow({
   const t = useTheme()
   const file = row.file
   const hasNumstat = file.added !== null || file.removed !== null
+  const reviewed = useAppStore((s) => isGitFileReviewed(file, s.gitMode.reviewed))
   const bg = isSelected ? t.backgroundElement : undefined
   const onSelect = useCallback(() => {
     dispatchGlobal({ key: row.key, type: 'git-mode-select-entry-by-key' })
@@ -269,9 +271,11 @@ const FileRow = memo(function FileRow({
       : ''
   return (
     <box flexDirection="row" gap={1} backgroundColor={bg} onMouseDown={onSelect}>
+      {/* A reviewed file trades its status letter for the mark: the counts on
+          the right still say what changed. */}
       <box width={2} flexShrink={0} justifyContent="center">
-        <text selectable={false} fg={statusColor(file.status)} bg={bg}>
-          <strong>{displayStatus(file)}</strong>
+        <text selectable={false} fg={reviewed ? t.success : statusColor(file.status)} bg={bg}>
+          <strong>{reviewed ? '✓' : displayStatus(file)}</strong>
         </text>
       </box>
       {repoTag ? (

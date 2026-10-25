@@ -2,7 +2,7 @@ import { expect, test } from 'bun:test'
 
 import type { AppState, DiffData, GitFileEntry } from '../../src/state/types'
 
-import { gitFileKey, gitFolderKey } from '../../src/state/git-tree'
+import { gitFileKey, gitFolderKey, isGitFileReviewed } from '../../src/state/git-tree'
 import { appReducer, createInitialState } from '../../src/state/store'
 
 function entry(path: string): GitFileEntry {
@@ -297,4 +297,37 @@ test('exit-git-mode drops the file filter', () => {
   s = appReducer(s, { type: 'commit-git-file-filter' })
   s = appReducer(s, { type: 'exit-git-mode' })
   expect(s.gitMode.fileFilter).toBe('')
+})
+
+test('git-mode-toggle-reviewed marks the selected file until its counts move', () => {
+  const s0 = appReducer(seedWithFiles([entry('a.ts'), entry('b.ts')]), { type: 'enter-git-mode' })
+  const s1 = appReducer(s0, { type: 'git-mode-toggle-reviewed' })
+  expect(s1.gitMode.reviewed).toEqual({ ':a.ts': '0|0' })
+  expect(isGitFileReviewed(entry('a.ts'), s1.gitMode.reviewed)).toBe(true)
+  // The agent edits it again: the mark no longer holds, with nothing cleared.
+  expect(isGitFileReviewed({ ...entry('a.ts'), added: 3 }, s1.gitMode.reviewed)).toBe(false)
+  // Staging keeps it: the mark names the path, not the section.
+  expect(isGitFileReviewed({ ...entry('a.ts'), section: 'staged' }, s1.gitMode.reviewed)).toBe(true)
+  const s2 = appReducer(s1, { type: 'git-mode-toggle-reviewed' })
+  expect(s2.gitMode.reviewed).toEqual({})
+})
+
+test('hiding reviewed files moves the selection to the next one', () => {
+  const s0 = appReducer(seedWithFiles([entry('a.ts'), entry('b.ts'), entry('c.ts')]), {
+    type: 'enter-git-mode',
+  })
+  const s1 = appReducer(s0, { type: 'git-mode-toggle-hide-reviewed' })
+  expect(s1.gitMode.selectedEntryKey).toBe('unstaged:a.ts')
+  const s2 = appReducer(s1, { type: 'git-mode-toggle-reviewed' })
+  expect(s2.gitMode.selectedEntryKey).toBe('unstaged:b.ts')
+  const s3 = appReducer(s2, { type: 'git-mode-toggle-hide-reviewed' })
+  expect(s3.gitMode.hideReviewed).toBe(false)
+  expect(s3.gitMode.selectedEntryKey).toBe('unstaged:b.ts')
+})
+
+test('git-panel-reset drops review marks', () => {
+  const s0 = appReducer(seedWithFiles([entry('a.ts')]), { type: 'enter-git-mode' })
+  const s1 = appReducer(s0, { type: 'git-mode-toggle-reviewed' })
+  const s2 = appReducer(s1, { type: 'git-panel-reset' })
+  expect(s2.gitMode.reviewed).toEqual({})
 })
