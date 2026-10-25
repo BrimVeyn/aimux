@@ -11,9 +11,12 @@ import { fetchDiff } from '../../src/git/git-diff'
 import { isPng } from '../../src/ui/terminal-graphics/format-fallback'
 import {
   changedPages,
+  changedPagesSoFar,
   pdfPageCount,
   pdfPageFingerprints,
+  pdfTextFingerprints,
   renderPdfPage,
+  watchPdfPageFingerprints,
 } from '../../src/ui/terminal-graphics/pdf-render'
 import { makePdf } from '../fixtures/make-pdf'
 
@@ -77,6 +80,15 @@ test('changedPages compares by position and counts pages only one side has', () 
   expect(changedPages(['a', 'b'], ['a', 'b'])).toEqual([])
 })
 
+test('changedPagesSoFar says nothing past a side still working, and reads a finished one as ended', () => {
+  const working = (hashes: string[]) => ({ done: false, hashes })
+  const finished = (hashes: string[]) => ({ done: true, hashes })
+  expect(changedPagesSoFar(working(['a', 'b', 'c']), working(['a', 'x']))).toEqual([2])
+  expect(changedPagesSoFar(finished(['a']), working(['a', 'b', 'c']))).toEqual([2, 3])
+  expect(changedPagesSoFar(working(['a']), finished(['a', 'b']))).toEqual([])
+  expect(changedPagesSoFar(finished(['a', 'b']), finished(['a', 'x', 'c']))).toEqual([2, 3])
+})
+
 describe.skipIf(!hasPoppler)('rendering through poppler', () => {
   test('counts pages', async () => {
     expect(await pdfPageCount(makePdf(['a', 'b', 'c']))).toBe(3)
@@ -95,5 +107,46 @@ describe.skipIf(!hasPoppler)('rendering through poppler', () => {
     ])
     expect(before).toHaveLength(3)
     expect(changedPages(before ?? [], after ?? [])).toEqual([2])
+  })
+
+  test('fingerprints report their pages as they come and end with all of them', async () => {
+    const reports: { count: number; done: boolean }[] = []
+    await new Promise<void>((resolve) => {
+      watchPdfPageFingerprints(makePdf(['p1', 'p2', 'p3', 'p4']), ({ done, hashes }) => {
+        reports.push({ count: hashes?.length ?? -1, done })
+        if (done) resolve()
+      })
+    })
+    expect(reports.at(-1)).toEqual({ count: 4, done: true })
+    expect(reports.slice(0, -1).every((r) => !r.done && r.count < 4)).toBe(true)
+  })
+
+  test('a pass everyone left is dropped, and the next one starts over', async () => {
+    const doc = makePdf(['left', 'behind'])
+    const stop = watchPdfPageFingerprints(doc, () => {})
+    stop()
+    expect(await pdfPageFingerprints(doc)).toHaveLength(2)
+  })
+
+  test('a render cancelled by its only caller does not poison the cache', async () => {
+    const doc = makePdf(['cancelled'])
+    const controller = new AbortController()
+    const first = renderPdfPage(doc, 1, 36, controller.signal)
+    controller.abort()
+    await first
+    const again = await renderPdfPage(doc, 1, 36)
+    expect(again.kind).toBe('ok')
+  })
+})
+
+describe.skipIf(Bun.which('pdftotext') === null)('text fingerprints', () => {
+  test('cover every page, past where the raster pass stops', async () => {
+    const pages = Array.from({ length: 502 }, (_, i) => `page ${i + 1}`)
+    const [before, after] = await Promise.all([
+      pdfTextFingerprints(makePdf(pages)),
+      pdfTextFingerprints(makePdf([...pages.slice(0, 501), 'edited'])),
+    ])
+    expect(before).toHaveLength(502)
+    expect(changedPages(before ?? [], after ?? [])).toEqual([502])
   })
 })
