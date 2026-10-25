@@ -18,6 +18,7 @@ import {
   filterGitFiles,
   getSelectedGitFile,
   gitFileKey,
+  hiddenReviewed,
 } from '../../../state/git-tree'
 import { getActiveWorkspace, getActiveWorkspacePath } from '../../../state/project-workspaces'
 import { setGitDiffScroller } from '../../git-view-controls'
@@ -44,6 +45,7 @@ export const GitView = memo(function GitView({ themeId }: GitViewProps) {
   const projects = useAppStore((s) => s.projects)
   const focusMode = useAppStore((s) => s.focusMode)
   const fileFilter = useAppStore(activeGitFileFilter)
+  const hidden = useAppStore(hiddenReviewed)
   const diffRef = useRef<PierreDiffHandle | null>(null)
 
   const currentProject =
@@ -88,8 +90,8 @@ export const GitView = memo(function GitView({ themeId }: GitViewProps) {
   // The sidebar, the selection and the diff all read the filtered list, so
   // nothing on screen can point at a file the filter hides.
   const visibleGitPanel = useMemo(
-    () => ({ ...gitPanel, files: filterGitFiles(gitPanel.files, fileFilter) }),
-    [gitPanel, fileFilter]
+    () => ({ ...gitPanel, files: filterGitFiles(gitPanel.files, fileFilter, hidden) }),
+    [gitPanel, fileFilter, hidden]
   )
 
   const selectedFile = getSelectedGitFile(visibleGitPanel.files, {
@@ -225,7 +227,7 @@ export const GitView = memo(function GitView({ themeId }: GitViewProps) {
             collapsedFolders={gitMode.collapsedFolders}
             compact={gitPane.treeCompaction}
             fileListMode={gitPane.fileListMode}
-            filtered={fileFilter !== ''}
+            filtered={fileFilter !== '' || hidden !== null}
             gitPanel={visibleGitPanel}
             headOffset={gitMode.headOffset}
             projectPath={projectPath}

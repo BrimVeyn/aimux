@@ -6,7 +6,12 @@ import { diffHash } from '../../../../git/diff-hash'
 import { fetchDiff } from '../../../../git/git-diff'
 import { useAppStore } from '../../../../state/app-store'
 import { dispatchGlobal } from '../../../../state/dispatch-ref'
-import { activeGitFileFilter, buildGitTreeRows, filterGitFiles } from '../../../../state/git-tree'
+import {
+  activeGitFileFilter,
+  buildGitTreeRows,
+  filterGitFiles,
+  hiddenReviewed,
+} from '../../../../state/git-tree'
 import { prepareDiff } from './prepare-diff'
 
 interface PrefetchOptions {
@@ -91,8 +96,12 @@ export function useDiffPrefetch(
 ): void {
   const allFiles = useAppStore((s) => s.gitPanel.files)
   const fileFilter = useAppStore(activeGitFileFilter)
+  const hidden = useAppStore(hiddenReviewed)
   // Neighbours in the list the user is looking at, not in the one it filters.
-  const files = useMemo(() => filterGitFiles(allFiles, fileFilter), [allFiles, fileFilter])
+  const files = useMemo(
+    () => filterGitFiles(allFiles, fileFilter, hidden),
+    [allFiles, fileFilter, hidden]
+  )
   const diffs = useAppStore((s) => s.gitMode.diffs)
   const parsed = useAppStore((s) => s.gitMode.parsedFiles)
   const loading = useAppStore((s) => s.gitMode.loading)

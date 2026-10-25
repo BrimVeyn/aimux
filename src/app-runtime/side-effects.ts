@@ -14,7 +14,7 @@ import { getActiveWorkspace, getActiveWorkspacePath } from '../state/project-wor
 import { toast } from '../state/toast-store'
 import { beginWorkspaceDelete, endWorkspaceDelete } from '../state/workspace-delete-store'
 import { filterThemeIds } from '../ui/filter-themes'
-import { scrollGitDiff } from '../ui/git-view-controls'
+import { jumpGitHunk, scrollGitDiff } from '../ui/git-view-controls'
 import { applyTheme, getCurrentMode, getTransparent, setMode, setTransparent } from '../ui/theme'
 import { emitAppEvent } from './app-events'
 import { openFileInEditor, openSelectedSnippetSourceInEditor } from './editor-actions'
@@ -27,6 +27,7 @@ import {
   runGitPush,
   runGitRm,
 } from './git-actions'
+import { copyGitHunk } from './git-hunk-actions'
 import {
   handleCycleSidebarItem,
   handleSwitchProjectByIndex,
@@ -492,6 +493,14 @@ export function executeSideEffect(effect: SideEffect, ctx: SideEffectContext): v
     }
     case 'scroll-git-diff': {
       scrollGitDiff(effect.delta)
+      return
+    }
+    case 'jump-git-hunk': {
+      jumpGitHunk(effect.delta)
+      return
+    }
+    case 'copy-git-hunk': {
+      copyGitHunk(ctx, effect.to)
       return
     }
     case 'persist-git-diff-mode-ratio': {

@@ -17,13 +17,16 @@ import type { ThemeId } from '../../../themes'
 
 import { useAppStore } from '../../../../state/app-store'
 import { dispatchGlobal } from '../../../../state/dispatch-ref'
+import { useDiffScroll } from '../../../git-view-controls'
 import { useTheme } from '../../../theme'
 import {
   buildDiffSegments,
   buildFileSegments,
+  type DiffSegment,
   firstChangeSegmentOffset,
   type SplitWidths,
 } from './build-rows'
+import { changeBlockOffsets, changeBlocks, formatChangeBlock } from './hunks'
 import { SplitView, type SplitViewHandle } from './split-view'
 import { StackedView, type StackedViewHandle } from './stacked-view'
 import { useDiffPreparation } from './use-diff-preparation'
@@ -112,6 +115,71 @@ export const PierreDiff = forwardRef<PierreDiffHandle, Props>(function PierreDif
     [view]
   )
 
+  const scrollTo = useCallback(
+    (target: number) => {
+      if (view === 'split') {
+        const left = splitRef.current?.leftScroll
+        const right = splitRef.current?.rightScroll
+        if (left) left.scrollTop = target
+        if (right && right !== left) right.scrollTop = target
+      } else {
+        const node = stackedRef.current?.scroll
+        if (node) node.scrollTop = target
+      }
+    },
+    [view]
+  )
+
+  // Where each change block starts, worked out on the first hunk key rather than
+  // on every resize: it walks every row of the file.
+  const blocksRef = useRef<{
+    offsets: number[]
+    segments: DiffSegment[]
+    widths: SplitWidths
+  } | null>(null)
+  // The block the last jump landed on, while the view has not moved since: a
+  // block near the end cannot reach the top, so the top alone would name another.
+  const landedRef = useRef<{ index: number; top: number } | null>(null)
+  const slot = useDiffScroll()
+  useEffect(() => {
+    if (!file || view === 'single') return
+    const blocks = changeBlocks(file)
+    const offsets = (): number[] => {
+      const hit = blocksRef.current
+      if (hit && hit.segments === segments && hit.widths === widths) return hit.offsets
+      // Two rows of what came before, as the view opens on the first change.
+      const next = changeBlockOffsets(file, segments, widths, view).map((o) => Math.max(0, o - 2))
+      blocksRef.current = { offsets: next, segments, widths }
+      return next
+    }
+    const top = (): number =>
+      (view === 'split' ? splitRef.current?.leftScroll : stackedRef.current?.scroll)?.scrollTop ?? 0
+    const currentIndex = (): number => {
+      const at = top()
+      const landed = landedRef.current
+      if (landed && landed.top === at) return landed.index
+      return Math.max(
+        0,
+        offsets().findLastIndex((o) => o <= at)
+      )
+    }
+    return slot.provideHunks({
+      current: () => {
+        const block = blocks[currentIndex()]
+        return block ? formatChangeBlock(file, block, path) : null
+      },
+      jump: (delta) => {
+        const all = offsets()
+        if (all.length === 0) return
+        const at = top()
+        const index = delta > 0 ? all.findIndex((o) => o > at) : all.findLastIndex((o) => o < at)
+        if (index < 0) return
+        scrollTo(all[index] ?? 0)
+        landedRef.current = { index, top: top() }
+      },
+    })
+  }, [file, path, scrollTo, segments, slot, view, widths])
+
   useEffect(() => {
     // Wait for the first measurement: offsets taken before it count every line
     // as one row, and a wrapped prologue would land the view short of the change.
@@ -122,22 +190,12 @@ export const PierreDiff = forwardRef<PierreDiffHandle, Props>(function PierreDif
     const offset = firstChangeSegmentOffset(file, EMPTY_FOLDS, widths, view)
     if (offset < 0) return
     const target = Math.max(0, offset - 2)
-    const apply = (): void => {
-      if (view === 'split') {
-        const left = splitRef.current?.leftScroll
-        const right = splitRef.current?.rightScroll
-        if (left) left.scrollTop = target
-        if (right && right !== left) right.scrollTop = target
-      } else {
-        const node = stackedRef.current?.scroll
-        if (node) node.scrollTop = target
-      }
-    }
+    const apply = (): void => scrollTo(target)
     let raf = renderer.requestAnimationFrame(() => {
       raf = renderer.requestAnimationFrame(apply)
     })
     return () => renderer.cancelAnimationFrame(raf)
-  }, [cacheKey, file, renderer, view, widths])
+  }, [cacheKey, file, renderer, scrollTo, view, widths])
 
   if (!file) {
     return (

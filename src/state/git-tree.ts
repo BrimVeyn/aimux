@@ -50,19 +50,50 @@ export function gitFileKey(
     : `${file.section}:${file.path}`
 }
 
-let lastFilter: { files: GitFileEntry[]; filter: string; out: GitFileEntry[] } | null = null
+/** Names a file for its review mark: by path, so staging it keeps the mark. */
+export function gitReviewKey(file: Pick<GitFileEntry, 'path'> & { repoPath?: string }): string {
+  return `${file.repoPath ?? ''}:${file.path}`
+}
+
+/** What a review mark remembers of a file: its line counts when it was marked. */
+export function gitReviewSignature(file: Pick<GitFileEntry, 'added' | 'removed'>): string {
+  return `${file.added ?? '-'}|${file.removed ?? '-'}`
+}
+
+export function isGitFileReviewed(file: GitFileEntry, reviewed: Record<string, string>): boolean {
+  return reviewed[gitReviewKey(file)] === gitReviewSignature(file)
+}
+
+let lastFilter: {
+  files: GitFileEntry[]
+  filter: string
+  hidden: Record<string, string> | null
+  out: GitFileEntry[]
+} | null = null
 
 /**
- * Files whose path contains `filter`, ignoring case. An empty filter keeps them
- * all. The last answer is kept, and handed back as the same array, so the tree
- * built from it is not built again on the next keypress.
+ * Files whose path contains `filter`, ignoring case, less the reviewed ones when
+ * `hidden` holds the review marks. An empty filter and no marks keep them all.
+ * The last answer is kept, and handed back as the same array, so the tree built
+ * from it is not built again on the next keypress.
  */
-export function filterGitFiles(files: GitFileEntry[], filter: string | null): GitFileEntry[] {
-  if (filter == null || filter === '') return files
-  if (lastFilter?.files === files && lastFilter.filter === filter) return lastFilter.out
-  const lower = filter.toLowerCase()
-  const out = files.filter((file) => file.path.toLowerCase().includes(lower))
-  lastFilter = { files, filter, out }
+export function filterGitFiles(
+  files: GitFileEntry[],
+  filter: string | null,
+  hidden: Record<string, string> | null = null
+): GitFileEntry[] {
+  const text = filter ?? ''
+  if (text === '' && hidden === null) return files
+  if (lastFilter?.files === files && lastFilter.filter === text && lastFilter.hidden === hidden) {
+    return lastFilter.out
+  }
+  const lower = text.toLowerCase()
+  const out = files.filter(
+    (file) =>
+      file.path.toLowerCase().includes(lower) &&
+      (hidden === null || !isGitFileReviewed(file, hidden))
+  )
+  lastFilter = { files, filter: text, hidden, out }
   return out
 }
 
@@ -75,11 +106,16 @@ export function activeGitFileFilter(state: Pick<AppState, 'gitMode' | 'modal'>):
   return state.gitMode.fileFilter
 }
 
+/** The review marks to leave out of the list, or null when reviewed files show. */
+export function hiddenReviewed(state: Pick<AppState, 'gitMode'>): Record<string, string> | null {
+  return state.gitMode.hideReviewed ? state.gitMode.reviewed : null
+}
+
 /** The files git mode lists, navigates and selects among. */
 export function gitModeVisibleFiles(
   state: Pick<AppState, 'gitMode' | 'gitPanel' | 'modal'>
 ): GitFileEntry[] {
-  return filterGitFiles(state.gitPanel.files, activeGitFileFilter(state))
+  return filterGitFiles(state.gitPanel.files, activeGitFileFilter(state), hiddenReviewed(state))
 }
 
 export function gitFolderKey(section: GitFileSection, folderPath: string): string {
@@ -232,16 +268,21 @@ export function visibleGitKeys(
 
 /**
  * Keeps git mode's selection on a row the sidebar still shows, after the files
- * or the filter changed. Returns the state untouched when it already is.
+ * or the filter changed. Returns the state untouched when it already is. Given
+ * the rows shown before, a selection that left the list moves to its neighbour.
  */
-export function reconcileGitSelection<S extends AppState>(state: S): S {
+export function reconcileGitSelection<S extends AppState>(
+  state: S,
+  previousKeys: readonly string[] = []
+): S {
   const selectedEntryKey = reconcileSelectedGitEntryKey(
     gitModeVisibleFiles(state),
     state.gitMode.collapsedFolders,
     state.gitPane.fileListMode,
     state.gitMode.selectedEntryKey,
     [],
-    state.gitPane.treeCompaction
+    state.gitPane.treeCompaction,
+    previousKeys
   )
   if (selectedEntryKey === state.gitMode.selectedEntryKey) return state
   return { ...state, gitMode: { ...state.gitMode, pendingDeletePath: null, selectedEntryKey } }

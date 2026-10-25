@@ -11,6 +11,7 @@ import { clampGitPaneRatio } from '../git-pane-sizing'
 import {
   activeGitFileFilter,
   filterGitFiles,
+  hiddenReviewed,
   reconcileSelectedGitEntryKey,
   visibleGitKeys,
 } from '../git-tree'
@@ -136,14 +137,14 @@ export function reduceGitPanelState(state: AppState, action: AppAction): AppStat
       const sortedNext = sortFilesBySection(next.files)
       const filter = activeGitFileFilter(state)
       const nextSelectedEntryKey = reconcileSelectedGitEntryKey(
-        filterGitFiles(sortedNext, filter),
+        filterGitFiles(sortedNext, filter, hiddenReviewed(state)),
         state.gitMode.collapsedFolders,
         state.gitPane.fileListMode,
         state.gitMode.selectedEntryKey,
         [],
         state.gitPane.treeCompaction,
         visibleGitKeys(
-          filterGitFiles(prev.files, filter),
+          filterGitFiles(prev.files, filter, hiddenReviewed(state)),
           state.gitMode.collapsedFolders,
           state.gitPane.fileListMode,
           state.gitPane.treeCompaction
@@ -216,6 +217,8 @@ export function reduceGitPanelState(state: AppState, action: AppAction): AppStat
           loading: {},
           parsedFiles: {},
           pendingDeletePath: null,
+          // Marks name paths, and these paths now belong to another tree.
+          reviewed: {},
           selectedEntryKey: null,
         },
         gitPanel: emptyGitPanel(),

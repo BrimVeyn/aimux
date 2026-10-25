@@ -784,6 +784,16 @@ export function scrollGitDiff(delta: number): KeyResult {
   return r([], [{ delta, type: 'scroll-git-diff' }])
 }
 
+export function jumpGitHunk(delta: 1 | -1): KeyResult {
+  return r([], [{ delta, type: 'jump-git-hunk' }])
+}
+
+export const copyGitHunk: KeyResult = r([], [{ to: 'clipboard', type: 'copy-git-hunk' }])
+export const sendGitHunkToAgent: KeyResult = r([], [{ to: 'agent', type: 'copy-git-hunk' }])
+
+export const toggleGitReviewed: KeyResult = r([{ type: 'git-mode-toggle-reviewed' }])
+export const toggleGitHideReviewed: KeyResult = r([{ type: 'git-mode-toggle-hide-reviewed' }])
+
 export const toggleGitDiffView: KeyResult = r([{ type: 'git-mode-toggle-diff-view' }])
 
 export const toggleGitMarkdownView: KeyResult = r([{ type: 'git-mode-toggle-markdown-view' }])

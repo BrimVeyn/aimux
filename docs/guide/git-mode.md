@@ -107,6 +107,12 @@ Actions on the selected file:
 | `v`   | Toggle split / stacked diff                      |
 | `r`   | Toggle rendered / source diff for Markdown       |
 | `e`   | Expand / collapse all folds                      |
+| `x`   | Mark / unmark the file reviewed                  |
+| `H`   | Hide / show reviewed files                       |
+| `J`   | Next change in the diff                          |
+| `K`   | Previous change in the diff                      |
+| `y`   | Copy the change with its location                |
+| `Y`   | Add the change to the agent's prompt             |
 | `t`   | Toggle flat / tree list                          |
 | `]`   | Older commit (HEAD~N → N+1)                      |
 | `[`   | Newer commit (HEAD~N → N-1)                      |
@@ -138,6 +144,34 @@ Diff view scroll and layout:
 - `Ctrl+D` / `Ctrl+U` — page down / page up
 - `Ctrl+L` — widen the file-bar pane
 - `Backspace` / `Ctrl+H` — narrow the file-bar pane
+
+## Reviewing an Agent's Changes
+
+Three habits for going through a large change set, file by file:
+
+- **Reviewed marks.** `x` marks the selected file reviewed: its status letter
+  becomes `✓`. A mark remembers the file's line counts, so when the agent
+  edits the file again it reads as unreviewed by itself. Staging keeps the
+  mark. `H` hides reviewed files from the list, and with them hidden, marking
+  a file moves the selection to the next one. Marks last for the session and
+  are dropped when you switch workspace.
+- **Change navigation.** `J` / `K` scroll to the next / previous change —
+  a run of added and removed lines — in split and stacked layouts alike.
+- **Feedback with context.** `y` copies the change at the top of the view
+  with its location, ready to paste:
+
+  ````text
+  src/server.ts:42-48
+  ```diff
+  -const port = 3000
+  +const port = Number(process.env.PORT ?? 3000)
+  ```
+  ````
+
+  `Y` pastes the same text into the prompt of the agent the git view was
+  opened over (or the workspace's first running agent) without sending it,
+  so you can gather several changes, add a sentence, and send them as one
+  message.
 
 The destructive `d` requires two presses on unstaged or untracked files
 (the first arms the action, the second confirms) to prevent accidental
