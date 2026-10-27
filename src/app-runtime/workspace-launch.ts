@@ -4,13 +4,14 @@ import type { SideEffectContext } from './side-effect-context'
 import { enqueueGitOp } from '../git/command-queue'
 import { createPrefixedId } from '../platform/id'
 import { branchNamingInstructions } from '../settings/live'
+import { saveProjectCatalog } from '../state/project-catalog'
 import { hasSetupScript } from '../state/project-data'
 import { findWorkspace } from '../state/project-workspaces'
 import { toast } from '../state/toast-store'
 import { planWorkspaceCreate } from '../state/workspace-create-store'
 import { findSetupTab } from './setup-actions'
 import { launchWithPrompt } from './tab-actions'
-import { createAimuxTempWorkspace } from './workspace-actions'
+import { createAimuxTempWorkspace, replaceProject } from './workspace-actions'
 import { placeholderWorkspaceName, renameWorkspaceFromPrompt } from './workspace-naming'
 
 /**
@@ -23,6 +24,16 @@ import { placeholderWorkspaceName, renameWorkspaceFromPrompt } from './workspace
  * can ever be in flight.
  */
 let pendingWorkspaceCreate: Promise<void> | null = null
+
+/** Keeps the prompt on its project until the worktree exists; '' drops it. */
+function saveWorkspacePromptDraft(ctx: SideEffectContext, projectId: string, draft: string): void {
+  const projects = replaceProject(ctx, projectId, (project) => ({
+    ...project,
+    workspacePromptDraft: draft === '' ? undefined : draft,
+  }))
+  saveProjectCatalog(projects)
+  ctx.dispatch({ projects, type: 'set-projects' })
+}
 
 /**
  * The `<C-p>` flow: chain into the new-tab modal *now* and cut the worktree in
@@ -45,9 +56,10 @@ export function startWorkspaceCreation(
   // Cleared now: the previous create's steps would otherwise show, all ticked,
   // until the git queue lets this one plan its own.
   planWorkspaceCreate([])
+  saveWorkspacePromptDraft(ctx, projectId, params.prompt)
   pendingWorkspaceCreate = (async () => {
     try {
-      await enqueueGitOp(async () =>
+      const workspace = await enqueueGitOp(async () =>
         // A name derived locally from the prompt, so the sidebar reads right from
         // the first frame. The model-generated one replaces it a few seconds later.
         // The branch is left to `createAimuxTempWorkspace`, which suffixes it with
@@ -59,6 +71,7 @@ export function startWorkspaceCreation(
           workspaceId,
         })
       )
+      if (workspace) saveWorkspacePromptDraft(ctx, projectId, '')
     } catch (error) {
       // The modal that would have shown this inline is already gone, so the
       // toast is the only channel left. The launch reads the missing record.

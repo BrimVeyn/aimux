@@ -256,6 +256,12 @@ export interface ProjectRecord {
    * is worse than no fold at all.
    */
   collapsed?: boolean
+  /**
+   * The prompt of a workspace being created, kept until its worktree exists.
+   * A failed create would otherwise throw away minutes of typing: the modal
+   * opens on it again.
+   */
+  workspacePromptDraft?: string
 }
 
 export interface ProjectBarState {
