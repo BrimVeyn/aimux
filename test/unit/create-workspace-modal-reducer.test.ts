@@ -131,3 +131,20 @@ test('set-create-workspace-base-branches leaves a base the user already chose', 
   if (s.modal.type !== 'create-workspace') throw new Error('expected create-workspace modal')
   expect(s.modal.baseRef).toBe('develop')
 })
+
+test('opens on the prompt of a create that never produced its worktree', () => {
+  const base = seed()
+  const withDraft: AppState = {
+    ...base,
+    projects: base.projects.map((project) => ({
+      ...project,
+      workspacePromptDraft: 'fix the login',
+    })),
+  }
+  const state = open(withDraft)
+  if (state.modal.type !== 'create-workspace') throw new Error('modal not open')
+  expect(state.modal.prompt).toBe('fix the login')
+  expect(state.modal.cursorPos).toBe('fix the login'.length)
+  const empty = open()
+  expect(empty.modal.type === 'create-workspace' && empty.modal.prompt).toBe('')
+})

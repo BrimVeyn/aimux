@@ -342,7 +342,10 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
         },
       }
     }
-    case 'open-create-workspace-modal':
+    case 'open-create-workspace-modal': {
+      const draft =
+        state.projects.find((project) => project.id === state.currentProjectId)
+          ?.workspacePromptDraft ?? ''
       return {
         ...state,
         focusMode: 'command-edit',
@@ -355,14 +358,15 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
           // the active workspace's branch here would win over that.
           baseRef: '',
           branchError: null,
-          cursorPos: 0,
+          cursorPos: draft.length,
           editBuffer: '',
           projectTargetId: null,
-          prompt: '',
+          prompt: draft,
           selectedIndex: 0,
           type: 'create-workspace',
         },
       }
+    }
     case 'switch-create-workspace-field': {
       if (state.modal.type !== 'create-workspace') return state
       const next =

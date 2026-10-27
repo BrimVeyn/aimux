@@ -183,7 +183,8 @@ export function isProjectRecord(value: unknown): value is ProjectRecord {
       (Array.isArray(value.workspaces) && value.workspaces.every(isWorkspaceRecord))) &&
     (value.activeWorkspaceId === undefined || isString(value.activeWorkspaceId)) &&
     (value.defaultBaseRef === undefined || isString(value.defaultBaseRef)) &&
-    (value.collapsed === undefined || isBoolean(value.collapsed))
+    (value.collapsed === undefined || isBoolean(value.collapsed)) &&
+    (value.workspacePromptDraft === undefined || isString(value.workspacePromptDraft))
   )
 }
 
